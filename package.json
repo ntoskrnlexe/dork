@@ -1,0 +1,24 @@
+{
+	"name": "dork",
+	"module": "src/server.ts",
+	"type": "module",
+	"scripts": {
+		"dev": "bun --hot src/server.ts",
+		"start": "bun src/server.ts",
+		"test": "bun test",
+		"lint": "oxlint . --type-aware"
+	},
+	"devDependencies": {
+		"@types/bun": "latest",
+		"oxfmt": "^0.45.0",
+		"oxlint": "^1.60.0"
+	},
+	"peerDependencies": {
+		"typescript": "^5"
+	},
+	"dependencies": {
+		"@xterm/addon-fit": "^0.11.0",
+		"@xterm/xterm": "^6.0.0",
+		"oxlint-tsgolint": "^0.21.0"
+	}
+}

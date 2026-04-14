@@ -1,0 +1,1553 @@
+Using normal formatting.
+Loading /home/beans/dork/zork1/zork1.zip.
+ West of House                                    Score: 0        Moves: 0
+
+ZORK I: The Great Underground Empire
+Infocom interactive fiction - a fantasy story
+Copyright (c) 1981, 1982, 1983, 1984, 1985, 1986 Infocom, Inc. All rights
+reserved.
+ZORK is a registered trademark of Infocom, Inc.
+Release 119 / Serial number 880429
+
+West of House
+You are standing in an open field west of a white house, with a boarded front
+door.
+There is a small mailbox here.
+
+> West of House                                    Score: 0        Moves: 1
+
+Opening the small mailbox reveals a leaflet.
+
+> West of House                                    Score: 0        Moves: 2
+
+(Taken)
+"WELCOME TO ZORK!
+
+ZORK is a game of adventure, danger, and low cunning. In it you will explore
+some of the most amazing territory ever seen by mortals. No computer should be
+without one!"
+
+> West of House                                    Score: 0        Moves: 3
+
+Dropped.
+
+> North of House                                   Score: 0        Moves: 4
+
+North of House
+You are facing the north side of a white house. There is no door here, and all
+the windows are boarded up. To the north a narrow path winds through the trees.
+
+> Forest Path                                      Score: 0        Moves: 5
+
+Forest Path
+This is a path winding through a dimly lit forest. The path heads north-south
+here. One particularly large tree with some low branches stands at the edge of
+the path.
+
+> Up a Tree                                        Score: 0        Moves: 6
+
+Up a Tree
+You are about 10 feet above the ground nestled among some large branches. The
+nearest branch above you is above your reach.
+Beside you on the branch is a small bird's nest.
+In the bird's nest is a large egg encrusted with precious jewels, apparently
+scavenged by a childless songbird. The egg is covered with fine gold inlay, and
+ornamented in lapis lazuli and mother-of-pearl. Unlike most eggs, this one is
+hinged and closed with a delicate looking clasp. The egg appears extremely
+fragile.
+
+> Up a Tree                                        Score: 5        Moves: 7
+
+Taken.
+
+> Forest Path                                      Score: 5        Moves: 8
+
+Forest Path
+You hear in the distance the chirping of a song bird.
+
+> North of House                                   Score: 5        Moves: 9
+
+North of House
+
+> Behind House                                     Score: 5        Moves: 10
+
+Behind House
+You are behind the white house. A path leads into the forest to the east. In one
+corner of the house there is a small window which is slightly ajar.
+
+> Behind House                                     Score: 5        Moves: 11
+
+With great effort, you open the window far enough to allow entry.
+
+> Kitchen                                          Score: 15       Moves: 12
+
+Kitchen
+You are in the kitchen of the white house. A table seems to have been used
+recently for the preparation of food. A passage leads to the west and a dark
+staircase can be seen leading upward. A dark chimney leads down and to the east
+is a small window which is open.
+A bottle is sitting on the table.
+The glass bottle contains:
+  A quantity of water
+On the table is an elongated brown sack, smelling of hot peppers.
+
+> Living Room                                      Score: 15       Moves: 13
+
+Living Room
+You are in the living room. There is a doorway to the east, a wooden door with
+strange gothic lettering to the west, which appears to be nailed shut, a trophy
+case, and a large oriental rug in the center of the room.
+Above the trophy case hangs an elvish sword of great antiquity.
+A battery-powered brass lantern is on the trophy case.
+
+> Living Room                                      Score: 15       Moves: 14
+
+Taken.
+
+> Living Room                                      Score: 15       Moves: 15
+
+With a great effort, the rug is moved to one side of the room, revealing the
+dusty cover of a closed trap door.
+
+> Living Room                                      Score: 15       Moves: 16
+
+The door reluctantly opens to reveal a rickety staircase descending into
+darkness.
+
+> Cellar                                           Score: 40       Moves: 17
+
+You have moved into a dark place.
+The trap door crashes shut, and you hear someone barring it.
+
+It is pitch black. You are likely to be eaten by a grue.
+
+> Cellar                                           Score: 40       Moves: 18
+
+The brass lantern is now on.
+
+Cellar
+You are in a dark and damp cellar with a narrow passageway leading north, and a
+crawlway to the south. On the west is the bottom of a steep metal ramp which is
+unclimbable.
+
+> Cellar                                           Score: 40       Moves: 19
+
+Dropped.
+
+> East of Chasm                                    Score: 40       Moves: 20
+
+East of Chasm
+You are on the east edge of a chasm, the bottom of which cannot be seen. A
+narrow passage goes north, and the path you are on continues to the east.
+
+> Gallery                                          Score: 40       Moves: 21
+
+Gallery
+This is an art gallery. Most of the paintings have been stolen by vandals with
+exceptional taste. The vandals left through either the north or west exits.
+Fortunately, there is still one chance for you to be a vandal, for on the far
+wall is a painting of unparalleled beauty.
+
+> Gallery                                          Score: 44       Moves: 22
+
+Taken.
+
+> Studio                                           Score: 44       Moves: 23
+
+Studio
+This appears to have been an artist's studio. The walls and floors are
+splattered with paints of 69 different colors. Strangely enough, nothing of
+value is hanging here. At the south end of the room is an open door (also
+covered with paint). A dark and narrow chimney leads up from a fireplace;
+although you might be able to get up it, it seems unlikely you could get back
+down.
+Loosely attached to a wall is a small piece of paper.
+
+> Kitchen                                          Score: 44       Moves: 24
+
+Kitchen
+A bottle is sitting on the table.
+The glass bottle contains:
+  A quantity of water
+On the table is an elongated brown sack, smelling of hot peppers.
+
+> Attic                                            Score: 44       Moves: 25
+
+Attic
+This is the attic. The only exit is a stairway leading down.
+A large coil of rope is lying in the corner.
+On a table is a nasty-looking knife.
+
+> Attic                                            Score: 44       Moves: 26
+
+Taken.
+
+> Kitchen                                          Score: 44       Moves: 27
+
+Kitchen
+A bottle is sitting on the table.
+The glass bottle contains:
+  A quantity of water
+On the table is an elongated brown sack, smelling of hot peppers.
+
+> Living Room                                      Score: 44       Moves: 28
+
+Living Room
+Above the trophy case hangs an elvish sword of great antiquity.
+
+> Living Room                                      Score: 44       Moves: 29
+
+Opened.
+
+> Living Room                                      Score: 50       Moves: 30
+
+Done.
+
+> Living Room                                      Score: 50       Moves: 31
+
+Taken.
+
+> Living Room                                      Score: 50       Moves: 32
+
+Dropped.
+
+> Living Room                                      Score: 50       Moves: 33
+
+The door reluctantly opens to reveal a rickety staircase descending into
+darkness.
+
+> Cellar                                           Score: 50       Moves: 34
+
+The trap door crashes shut, and you hear someone barring it.
+
+Cellar
+There is a jewel-encrusted egg here.
+Your sword is glowing with a faint blue glow.
+
+> The Troll Room                                   Score: 50       Moves: 35
+
+The Troll Room
+This is a small room with passages to the east and south and a forbidding hole
+leading west. Bloodstains and deep scratches (perhaps made by an axe) mar the
+walls.
+A nasty-looking troll, brandishing a bloody axe, blocks all passages out of the
+room.
+Your sword has begun to glow very brightly.
+
+> The Troll Room                                   Score: 50       Moves: 36
+
+You charge, but the troll jumps nimbly aside.
+The axe sweeps past as you jump aside.
+
+> The Troll Room                                   Score: 50       Moves: 37
+
+You charge, but the troll jumps nimbly aside.
+The troll's axe barely misses your ear.
+
+> Cellar                                           Score: 50       Moves: 38
+
+Cellar
+There is a jewel-encrusted egg here.
+Your sword is glowing with a faint blue glow.
+
+> East of Chasm                                    Score: 50       Moves: 39
+
+East of Chasm
+Your sword is no longer glowing.
+
+> Gallery                                          Score: 50       Moves: 40
+
+Gallery
+
+> Studio                                           Score: 50       Moves: 41
+
+Studio
+
+> Kitchen                                          Score: 50       Moves: 42
+
+Kitchen
+A bottle is sitting on the table.
+The glass bottle contains:
+  A quantity of water
+On the table is an elongated brown sack, smelling of hot peppers.
+
+> Kitchen                                          Score: 50       Moves: 43
+
+You are carrying:
+  A sword
+  A brass lantern (providing light)
+
+> Living Room                                      Score: 50       Moves: 44
+
+Living Room
+There is a rope here.
+Your collection of treasures consists of:
+    A painting
+
+> Living Room                                      Score: 50       Moves: 45
+
+Dropped.
+
+> Living Room                                      Score: 50       Moves: 46
+
+Taken.
+
+> Living Room                                      Score: 50       Moves: 47
+
+The door reluctantly opens to reveal a rickety staircase descending into
+darkness.
+
+> Cellar                                           Score: 50       Moves: 48
+
+The trap door crashes shut, and you hear someone barring it.
+
+Cellar
+There is a jewel-encrusted egg here.
+
+> The Troll Room                                   Score: 50       Moves: 49
+
+The Troll Room
+A nasty-looking troll, brandishing a bloody axe, blocks all passages out of the
+room.
+
+> The Troll Room                                   Score: 50       Moves: 50
+
+The troll fends you off with a menacing gesture.
+
+> The Troll Room                                   Score: 50       Moves: 51
+
+The troll fends you off with a menacing gesture.
+The axe sweeps past as you jump aside.
+
+> The Troll Room                                   Score: 50       Moves: 52
+
+You can't go that way.
+You stagger back under a hail of axe strokes.
+
+> The Troll Room                                   Score: 50       Moves: 53
+
+The troll fends you off with a menacing gesture.
+The troll's axe barely misses your ear.
+
+> The Troll Room                                   Score: 50       Moves: 54
+
+You can't see any railing here!
+The axe sweeps past as you jump aside.
+
+> The Troll Room                                   Score: 50       Moves: 55
+
+You can't go that way.
+The axe sweeps past as you jump aside.
+
+> The Troll Room                                   Score: 50       Moves: 56
+
+You can't see any torch here!
+The axe sweeps past as you jump aside.
+
+> Cellar                                           Score: 50       Moves: 57
+
+Cellar
+There is a jewel-encrusted egg here.
+
+> Cellar                                           Score: 50       Moves: 58
+
+You can't go that way.
+
+> Cellar                                           Score: 50       Moves: 59
+
+You can't see any coffin here!
+
+> Cellar                                           Score: 50       Moves: 60
+
+You try to ascend the ramp, but it is impossible, and you slide back down.
+
+> East of Chasm                                    Score: 50       Moves: 61
+
+East of Chasm
+
+> East of Chasm                                    Score: 50       Moves: 62
+
+If you pray enough, your prayers may be answered.
+
+> East of Chasm                                    Score: 50       Moves: 63
+
+The brass lantern is now off.
+It is now pitch black.
+
+> Forest                                           Score: 40       Moves: 64
+
+Oh, no! You have walked into the slavering fangs of a lurking grue!
+
+    ****  You have died  ****
+
+Now, let's take a look here... Well, you probably deserve another chance. I
+can't quite fix you up completely, but you can't have everything.
+
+Forest
+This is a forest, with trees in all directions. To the east, there appears to be
+sunlight.
+
+> Clearing                                         Score: 40       Moves: 65
+
+Clearing
+You are in a clearing, with a forest surrounding you on all sides. A path leads
+south.
+On the ground is a pile of leaves.
+
+> Forest                                           Score: 40       Moves: 66
+
+Forest
+This is a dimly lit forest, with large trees all around.
+
+> Forest                                           Score: 40       Moves: 67
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 68
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 69
+
+The forest becomes impenetrable to the north.
+
+>You don't have that!
+
+> Forest                                           Score: 40       Moves: 70
+
+You can't see any coffin here!
+You hear in the distance the chirping of a song bird.
+
+> Forest                                           Score: 40       Moves: 71
+
+You can't see any sceptre here!
+
+>You don't have that!
+
+>You don't have that!
+
+> Forest                                           Score: 40       Moves: 72
+
+You can't see any gold here!
+
+> Forest                                           Score: 40       Moves: 73
+
+You can't see any coffin here!
+You hear in the distance the chirping of a song bird.
+
+> Forest                                           Score: 40       Moves: 74
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 75
+
+There is no tree here suitable for climbing.
+
+> Forest                                           Score: 40       Moves: 76
+
+There is no tree here suitable for climbing.
+
+> Forest                                           Score: 40       Moves: 77
+
+You can't go that way.
+
+> Forest Path                                      Score: 40       Moves: 78
+
+Forest Path
+
+> Forest Path                                      Score: 40       Moves: 79
+
+You're not at the house.
+You hear in the distance the chirping of a song bird.
+
+> Forest Path                                      Score: 40       Moves: 80
+
+You can't see any bag here!
+
+> Forest Path                                      Score: 40       Moves: 81
+
+You can't see any garlic here!
+
+> Forest                                           Score: 40       Moves: 82
+
+Forest
+
+>You don't have that!
+
+>You don't have that!
+
+>You don't have that!
+
+> Forest Path                                      Score: 40       Moves: 83
+
+Forest Path
+You hear in the distance the chirping of a song bird.
+
+> Forest                                           Score: 40       Moves: 84
+
+Forest
+
+> Forest                                           Score: 40       Moves: 85
+
+Forest
+The forest thins out, revealing impassable mountains.
+
+> Forest                                           Score: 40       Moves: 86
+
+The mountains are impassable.
+
+> Forest                                           Score: 40       Moves: 87
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 88
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 89
+
+Forest
+
+> Forest                                           Score: 40       Moves: 90
+
+You can't see any torch here!
+
+> Forest                                           Score: 40       Moves: 91
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 92
+
+There is no tree here suitable for climbing.
+
+> Forest                                           Score: 40       Moves: 93
+
+There is no tree here suitable for climbing.
+You hear in the distance the chirping of a song bird.
+
+> Forest                                           Score: 40       Moves: 94
+
+You can't go that way.
+
+> Forest Path                                      Score: 40       Moves: 95
+
+Forest Path
+
+> Forest Path                                      Score: 40       Moves: 96
+
+You're not at the house.
+
+> Forest                                           Score: 40       Moves: 97
+
+Forest
+
+> Forest                                           Score: 40       Moves: 98
+
+You can't see any trap door here!
+
+> Forest                                           Score: 40       Moves: 99
+
+You can't go that way.
+
+> Clearing                                         Score: 40       Moves: 100
+
+Clearing
+On the ground is a pile of leaves.
+
+> Forest                                           Score: 40       Moves: 101
+
+Forest
+
+> Forest                                           Score: 40       Moves: 102
+
+The forest becomes impenetrable to the north.
+
+> Forest                                           Score: 40       Moves: 103
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 104
+
+Forest
+
+> Forest                                           Score: 40       Moves: 105
+
+Forest
+
+> Forest                                           Score: 40       Moves: 106
+
+You can't see any matches here!
+
+> Forest                                           Score: 40       Moves: 107
+
+The forest becomes impenetrable to the north.
+
+> Forest                                           Score: 40       Moves: 108
+
+You can't see any wrench here!
+
+> Forest                                           Score: 40       Moves: 109
+
+You can't see any screwdriver here!
+
+> Forest                                           Score: 40       Moves: 110
+
+You can't see any yellow button here!
+
+> Clearing                                         Score: 40       Moves: 111
+
+Clearing
+You are in a small clearing in a well marked forest path that extends to the
+east and west.
+
+> Forest                                           Score: 40       Moves: 112
+
+Forest
+This is a dimly lit forest, with large trees all around.
+You hear in the distance the chirping of a song bird.
+
+> Forest                                           Score: 40       Moves: 113
+
+Those things aren't here!
+
+>You don't have that!
+
+> Forest                                           Score: 40       Moves: 114
+
+Storm-tossed trees block your way.
+
+> Forest                                           Score: 40       Moves: 115
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 116
+
+Storm-tossed trees block your way.
+
+> Forest                                           Score: 40       Moves: 117
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 118
+
+The rank undergrowth prevents eastward movement.
+
+> Forest                                           Score: 40       Moves: 119
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 120
+
+Storm-tossed trees block your way.
+
+> Forest                                           Score: 40       Moves: 121
+
+You can't see any bell here!
+
+> Forest                                           Score: 40       Moves: 122
+
+Storm-tossed trees block your way.
+
+> Forest                                           Score: 40       Moves: 123
+
+You can't see any candles here!
+
+> Forest                                           Score: 40       Moves: 124
+
+You can't see any book here!
+
+> Forest                                           Score: 40       Moves: 125
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 126
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 127
+
+You can't see any bell here!
+
+> Forest                                           Score: 40       Moves: 128
+
+You can't see any candles here!
+
+>You don't have that!
+
+>You don't have that!
+
+> Forest                                           Score: 40       Moves: 129
+
+You can't see any book here!
+
+>You don't have that!
+
+> Forest                                           Score: 40       Moves: 130
+
+Storm-tossed trees block your way.
+You hear in the distance the chirping of a song bird.
+
+> Forest                                           Score: 40       Moves: 131
+
+You can't see any skull here!
+You hear in the distance the chirping of a song bird.
+
+> Clearing                                         Score: 40       Moves: 132
+
+Clearing
+
+> Clearing                                         Score: 40       Moves: 133
+
+There is no tree here suitable for climbing.
+
+> Forest                                           Score: 40       Moves: 134
+
+Forest
+
+> Forest                                           Score: 40       Moves: 135
+
+You can't see any mirror here!
+
+> Forest                                           Score: 40       Moves: 136
+
+The forest becomes impenetrable to the north.
+
+> Forest Path                                      Score: 40       Moves: 137
+
+Forest Path
+
+> Clearing                                         Score: 40       Moves: 138
+
+Clearing
+On the ground is a pile of leaves.
+
+> Forest                                           Score: 40       Moves: 139
+
+Forest
+
+> Forest                                           Score: 40       Moves: 140
+
+You are empty-handed.
+
+> Clearing                                         Score: 40       Moves: 141
+
+Clearing
+On the ground is a pile of leaves.
+
+> Forest                                           Score: 40       Moves: 142
+
+Forest
+
+>You don't have that!
+
+>You don't have that!
+
+> Forest                                           Score: 40       Moves: 143
+
+You can't see any lamp here!
+
+> Forest                                           Score: 40       Moves: 144
+
+The forest becomes impenetrable to the north.
+
+> Forest                                           Score: 40       Moves: 145
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 146
+
+Forest
+
+> Forest                                           Score: 40       Moves: 147
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 148
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 149
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 150
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 151
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 152
+
+Forest
+
+> Forest                                           Score: 40       Moves: 153
+
+You can't see any coal here!
+You hear in the distance the chirping of a song bird.
+
+> Forest                                           Score: 40       Moves: 154
+
+The forest becomes impenetrable to the north.
+You hear in the distance the chirping of a song bird.
+
+> Forest                                           Score: 40       Moves: 155
+
+There is no tree here suitable for climbing.
+
+> Forest                                           Score: 40       Moves: 156
+
+There is no tree here suitable for climbing.
+
+> Forest                                           Score: 40       Moves: 157
+
+The forest becomes impenetrable to the north.
+
+> Forest                                           Score: 40       Moves: 158
+
+Forest
+
+> Forest                                           Score: 40       Moves: 159
+
+Forest
+
+> Forest                                           Score: 40       Moves: 160
+
+The forest becomes impenetrable to the north.
+You hear in the distance the chirping of a song bird.
+
+> Forest                                           Score: 40       Moves: 161
+
+There is no tree here suitable for climbing.
+
+> Clearing                                         Score: 40       Moves: 162
+
+Clearing
+
+>You don't have that!
+
+> Clearing                                         Score: 40       Moves: 163
+
+You can't see any basket here!
+
+> Forest                                           Score: 40       Moves: 164
+
+Forest
+
+> Forest                                           Score: 40       Moves: 165
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 166
+
+Forest
+
+> Forest                                           Score: 40       Moves: 167
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 168
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 169
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 170
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 171
+
+You can't go that way.
+
+> Forest                                           Score: 40       Moves: 172
+
+Forest
+
+>You don't have the forest.
+
+> Forest Path                                      Score: 40       Moves: 173
+
+Forest Path
+
+> Forest Path                                      Score: 40       Moves: 174
+
+You can't see any coal here!
+
+> Forest Path                                      Score: 40       Moves: 175
+
+You can't see any screwdriver here!
+
+> Forest Path                                      Score: 40       Moves: 176
+
+You can't see any torch here!
+
+> North of House                                   Score: 40       Moves: 177
+
+North of House
+There is a rope here.
+
+> North of House                                   Score: 40       Moves: 178
+
+You can't see any lid here!
+
+>You don't have that!
+
+> North of House                                   Score: 40       Moves: 179
+
+You can't see any lid here!
+
+> North of House                                   Score: 40       Moves: 180
+
+Those things aren't here!
+
+>You don't have that!
+
+> North of House                                   Score: 40       Moves: 181
+
+You can't see any lid here!
+
+> North of House                                   Score: 40       Moves: 182
+
+You can't see any diamond here!
+
+> Forest Path                                      Score: 40       Moves: 183
+
+Forest Path
+
+>You don't have that!
+
+>You don't have that!
+
+> Forest                                           Score: 40       Moves: 184
+
+Forest
+
+> Forest                                           Score: 40       Moves: 185
+
+You can't see any skull here!
+
+> Forest                                           Score: 40       Moves: 186
+
+You can't see any lamp here!
+
+> Forest                                           Score: 40       Moves: 187
+
+You can't see any garlic here!
+You hear in the distance the chirping of a song bird.
+
+> Forest                                           Score: 40       Moves: 188
+
+Forest
+
+> Forest                                           Score: 40       Moves: 189
+
+The mountains are impassable.
+
+> Forest                                           Score: 40       Moves: 190
+
+The mountains are impassable.
+
+> Forest                                           Score: 40       Moves: 191
+
+Forest
+
+> Forest                                           Score: 40       Moves: 192
+
+Forest
+
+> Forest                                           Score: 40       Moves: 193
+
+Forest
+
+> Forest                                           Score: 40       Moves: 194
+
+The forest becomes impenetrable to the north.
+
+> Forest                                           Score: 40       Moves: 195
+
+You can't see any bracelet here!
+
+> Forest                                           Score: 40       Moves: 196
+
+There is no tree here suitable for climbing.
+You hear in the distance the chirping of a song bird.
+
+> Clearing                                         Score: 40       Moves: 197
+
+Clearing
+
+> Clearing                                         Score: 40       Moves: 198
+
+You can't see any basket here!
+
+> Clearing                                         Score: 40       Moves: 199
+
+You can't see any basket here!
+
+> Clearing                                         Score: 40       Moves: 200
+
+You can't see any diamond here!
+
+> Clearing                                         Score: 40       Moves: 201
+
+You can't see any torch here!
+
+>You don't have that!
+
+> Behind House                                     Score: 40       Moves: 202
+
+Behind House
+
+>You don't have that!
+
+> Behind House                                     Score: 40       Moves: 203
+
+You can't see any jade here!
+
+> South of House                                   Score: 40       Moves: 204
+
+South of House
+You are facing the south side of a white house. There is no door here, and all
+the windows are boarded.
+
+> Behind House                                     Score: 40       Moves: 205
+
+Behind House
+
+> South of House                                   Score: 40       Moves: 206
+
+South of House
+
+> South of House                                   Score: 40       Moves: 207
+
+You can't go that way.
+
+> South of House                                   Score: 40       Moves: 208
+
+You can't go that way.
+
+> South of House                                   Score: 40       Moves: 209
+
+You are empty-handed.
+
+>You don't have that!
+
+>You don't have that!
+
+>You don't have that!
+
+>You don't have that!
+
+>You don't have that!
+
+> South of House                                   Score: 40       Moves: 210
+
+You can't go that way.
+
+> South of House                                   Score: 40       Moves: 211
+
+The windows are all boarded.
+
+> Behind House                                     Score: 40       Moves: 212
+
+Behind House
+
+> North of House                                   Score: 40       Moves: 213
+
+North of House
+There is a rope here.
+
+> North of House                                   Score: 40       Moves: 214
+
+You can't go that way.
+
+> Forest Path                                      Score: 40       Moves: 215
+
+Forest Path
+
+> Forest Path                                      Score: 40       Moves: 216
+
+You can't see any trunk here!
+
+> Clearing                                         Score: 40       Moves: 217
+
+Clearing
+On the ground is a pile of leaves.
+
+> Clearing                                         Score: 40       Moves: 218
+
+You can't see any pump here!
+
+> Clearing                                         Score: 40       Moves: 219
+
+The forest becomes impenetrable to the north.
+
+> Clearing                                         Score: 40       Moves: 220
+
+You are empty-handed.
+
+> Clearing                                         Score: 40       Moves: 221
+
+You can't see any trident here!
+
+> Forest Path                                      Score: 40       Moves: 222
+
+Forest Path
+
+> North of House                                   Score: 40       Moves: 223
+
+North of House
+There is a rope here.
+
+> North of House                                   Score: 40       Moves: 224
+
+The windows are all boarded.
+
+> Behind House                                     Score: 40       Moves: 225
+
+Behind House
+
+> Clearing                                         Score: 40       Moves: 226
+
+Clearing
+
+> Clearing                                         Score: 40       Moves: 227
+
+Those things aren't here!
+
+>You don't have that!
+
+> Clearing                                         Score: 40       Moves: 228
+
+You can't see any boat here!
+
+>What do you want to launch?
+
+> Clearing                                         Score: 40       Moves: 231
+
+Time passes...
+
+> Clearing                                         Score: 40       Moves: 234
+
+Time passes...
+
+> Clearing                                         Score: 40       Moves: 237
+
+Time passes...
+
+> Clearing                                         Score: 40       Moves: 240
+
+Time passes...
+
+> Clearing                                         Score: 40       Moves: 241
+
+You can't see any buoy here!
+
+> Canyon View                                      Score: 40       Moves: 242
+
+Canyon View
+You are at the top of the Great Canyon on its west wall. From here there is a
+marvelous view of the canyon and parts of the Frigid River upstream. Across the
+canyon, the walls of the White Cliffs join the mighty ramparts of the Flathead
+Mountains to the east. Following the Canyon upstream to the north, Aragain Falls
+may be seen, complete with rainbow. The mighty Frigid River flows out from a
+great dark cavern. To the west and south can be seen an immense forest,
+stretching for miles around. A path leads northwest. It is possible to climb
+down into the canyon from here.
+
+> Canyon View                                      Score: 40       Moves: 243
+
+You can't see any boat here!
+
+> Canyon View                                      Score: 40       Moves: 244
+
+You are empty-handed.
+
+>You don't have that!
+
+> Canyon View                                      Score: 40       Moves: 245
+
+You can't see any shovel here!
+
+> Canyon View                                      Score: 40       Moves: 246
+
+You can't go that way.
+
+>What do you want to dig in?
+
+> Canyon View                                      Score: 40       Moves: 247
+
+The ground is too hard for digging here.
+
+>What do you want to dig the sand with?
+
+>You don't have the ground.
+
+>What do you want to dig the sand with?
+
+>You don't have that!
+
+> Canyon View                                      Score: 40       Moves: 248
+
+You can't see any scarab here!
+
+> Canyon View                                      Score: 40       Moves: 249
+
+You can't go that way.
+
+> Canyon View                                      Score: 40       Moves: 250
+
+You can't see any buoy here!
+
+> Canyon View                                      Score: 40       Moves: 251
+
+You can't see any emerald here!
+
+> Canyon View                                      Score: 40       Moves: 252
+
+Storm-tossed trees block your way.
+
+> Canyon View                                      Score: 40       Moves: 253
+
+Storm-tossed trees block your way.
+
+> Canyon View                                      Score: 40       Moves: 254
+
+From here?!?
+
+> Canyon View                                      Score: 40       Moves: 255
+
+You can't go that way.
+
+> Canyon View                                      Score: 40       Moves: 256
+
+You can't go that way.
+
+> Canyon View                                      Score: 40       Moves: 257
+
+You can't go that way.
+
+> Clearing                                         Score: 40       Moves: 258
+
+Clearing
+
+> Behind House                                     Score: 40       Moves: 259
+
+Behind House
+
+> Kitchen                                          Score: 40       Moves: 260
+
+Kitchen
+A bottle is sitting on the table.
+The glass bottle contains:
+  A quantity of water
+On the table is an elongated brown sack, smelling of hot peppers.
+
+> Living Room                                      Score: 40       Moves: 261
+
+Living Room
+There is a brass lantern (battery-powered) here.
+There is a sword here.
+Your collection of treasures consists of:
+    A painting
+
+> Living Room                                      Score: 40       Moves: 262
+
+You are empty-handed.
+
+>You don't have that!
+
+>You don't have that!
+
+>You don't have that!
+
+>You don't have that!
+
+> Living Room                                      Score: 40       Moves: 263
+
+The trap door is closed.
+
+> Living Room                                      Score: 40       Moves: 264
+
+You can't go that way.
+
+> Living Room                                      Score: 40       Moves: 265
+
+The door is nailed shut.
+
+> Living Room                                      Score: 40       Moves: 266
+
+You can't go that way.
+
+> Kitchen                                          Score: 40       Moves: 267
+
+Kitchen
+A bottle is sitting on the table.
+The glass bottle contains:
+  A quantity of water
+On the table is an elongated brown sack, smelling of hot peppers.
+
+> Attic                                            Score: 40       Moves: 268
+
+You have moved into a dark place.
+It is pitch black. You are likely to be eaten by a grue.
+
+>It's too dark to see!
+
+>It's too dark to see!
+
+> Attic                                            Score: 40       Moves: 269
+
+You can't go that way.
+
+> Attic                                            Score: 40       Moves: 270
+
+You can't go that way.
+
+> Forest                                           Score: 30       Moves: 271
+
+Oh, no! You have walked into the slavering fangs of a lurking grue!
+
+    ****  You have died  ****
+
+Now, let's take a look here... Well, you probably deserve another chance. I
+can't quite fix you up completely, but you can't have everything.
+
+Forest
+
+> Forest                                           Score: 30       Moves: 272
+
+You can't go that way.
+
+> Forest                                           Score: 30       Moves: 273
+
+Wasn't he a sailor?
+
+> Forest                                           Score: 30       Moves: 274
+
+You can't go that way.
+
+> Forest Path                                      Score: 30       Moves: 275
+
+Forest Path
+
+> Forest                                           Score: 30       Moves: 276
+
+Forest
+
+>You don't have that!
+
+> Forest                                           Score: 30       Moves: 277
+
+You can't see any sword here!
+
+> Forest Path                                      Score: 30       Moves: 278
+
+Forest Path
+
+> Forest                                           Score: 30       Moves: 279
+
+Forest
+
+> Forest                                           Score: 30       Moves: 280
+
+There is no tree here suitable for climbing.
+
+>You don't have that!
+
+>You don't have that!
+
+>You don't have that!
+
+>You don't have that!
+
+> Forest                                           Score: 30       Moves: 281
+
+There's nothing here you can take.
+
+>You don't have that!
+
+> Forest                                           Score: 30       Moves: 282
+
+You can't see any chalice here!
+You hear in the distance the chirping of a song bird.
+
+> Forest                                           Score: 30       Moves: 283
+
+You can't go that way.
+
+> Forest                                           Score: 30       Moves: 284
+
+You can't go that way.
+
+> Forest                                           Score: 30       Moves: 285
+
+Forest
+
+> Forest                                           Score: 30       Moves: 286
+
+Forest
+
+> Forest                                           Score: 30       Moves: 287
+
+There is no tree here suitable for climbing.
+
+> Forest                                           Score: 30       Moves: 288
+
+You can't go that way.
+
+> Forest                                           Score: 30       Moves: 289
+
+You can't go that way.
+You hear in the distance the chirping of a song bird.
+
+>What do you want to unlock the grate with?
+
+> Forest                                           Score: 30       Moves: 290
+
+You can't see any grate here!
+
+> Forest                                           Score: 30       Moves: 291
+
+There is no tree here suitable for climbing.
+
+> Forest                                           Score: 30       Moves: 292
+
+Forest
+
+> Forest                                           Score: 30       Moves: 293
+
+There is no tree here suitable for climbing.
+
+> Forest                                           Score: 30       Moves: 294
+
+You can't see any canary here!
+You hear in the distance the chirping of a song bird.
+
+> Forest                                           Score: 30       Moves: 295
+
+You can't go that way.
+
+> Forest                                           Score: 30       Moves: 296
+
+You can't see any bauble here!
+
+> Forest                                           Score: 30       Moves: 297
+
+Storm-tossed trees block your way.
+
+> Forest                                           Score: 30       Moves: 298
+
+The rank undergrowth prevents eastward movement.
+
+> Forest                                           Score: 30       Moves: 299
+
+You're not at the house.
+
+> Forest                                           Score: 30       Moves: 300
+
+Forest
+
+>You don't have that!
+
+>You don't have that!
+
+> Forest                                           Score: 30       Moves: 301
+
+Those things aren't here!
+
+>You don't have that!
+
+>You don't have that!
+
+> Forest                                           Score: 30       Moves: 302
+
+You can't go that way.
+
+> Clearing                                         Score: 30       Moves: 303
+
+Clearing
+On the ground is a pile of leaves.
+
+> Forest                                           Score: 30       Moves: 304
+
+Forest
+
+> Forest                                           Score: 30       Moves: 305
+
+Forest
+
+> Forest                                           Score: 30       Moves: 306
+
+The mountains are impassable.
+
+> Forest                                           Score: 30       Moves: 307
+
+echo echo ...
+
+> Forest                                           Score: 30       Moves: 308
+
+You can't see any bar here!
+
+> Forest                                           Score: 30       Moves: 309
+
+Forest
+
+> Forest Path                                      Score: 30       Moves: 310
+
+Forest Path
+
+> Forest                                           Score: 30       Moves: 311
+
+Forest
+
+> Forest                                           Score: 30       Moves: 312
+
+Forest
+
+> Forest                                           Score: 30       Moves: 313
+
+There is no tree here suitable for climbing.
+
+>You don't have that!
+
+>You don't have that!
+
+> Forest                                           Score: 30       Moves: 314
+
+You can't see any map here!
+
+> Forest                                           Score: 30       Moves: 315
+
+You can't see any map here!
+
+> Forest                                           Score: 30       Moves: 316
+
+The rank undergrowth prevents eastward movement.
+
+> Forest                                           Score: 30       Moves: 317
+
+The rank undergrowth prevents eastward movement.
+
+> Forest                                           Score: 30       Moves: 318
+
+Storm-tossed trees block your way.
+
+> Forest                                           Score: 30       Moves: 319
+
+Forest
+
+> Forest                                           Score: 30       Moves: 320
+
+You can't go that way.
+
+> Forest                                           Score: 30       Moves: 321
+
+You would need a machete to go further west.
+
+>
+EOT
