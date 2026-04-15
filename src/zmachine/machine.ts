@@ -182,15 +182,19 @@ export class ZMachine {
 			return mem.get(globals + 2 * x);
 		};
 
+		// Locals (Int16Array) and globals (setInt16) truncate on write; the data stack
+		// is plain number[] so truncation has to be explicit to match Z-machine 16-bit
+		// wraparound semantics (caught by Praxix's comarith test on 17-bit intermediates).
+		const s16 = (y: number): number => (y << 16) >> 16;
 		const xstore = (x: number, y: number): void => {
-			if (x === 0) ds[ds.length - 1] = y;
+			if (x === 0) ds[ds.length - 1] = s16(y);
 			else if (x < 16) cs[0]!.local[x - 1] = y;
 			else mem.put(globals + 2 * x, y);
 		};
 
 		const store = (y: number): void => {
 			const x = pcgetb();
-			if (x === 0) ds.push(y);
+			if (x === 0) ds.push(s16(y));
 			else if (x < 16) cs[0]!.local[x - 1] = y;
 			else mem.put(globals + 2 * x, y);
 		};
@@ -474,16 +478,18 @@ export class ZMachine {
 					predicate(op0 > op1);
 					break; // GRTR?
 				case 4: // DLESS?
-					xstore(op0, (x = xfetch(op0) - 1));
+					x = s16(xfetch(op0) - 1);
+					xstore(op0, x);
 					predicate(x < op1);
 					break;
 				case 5: // IGRTR?
-					xstore(op0, (x = xfetch(op0) + 1));
+					x = s16(xfetch(op0) + 1);
+					xstore(op0, x);
 					predicate(x > op1);
 					break;
-				case 6:
-					predicate(getParent(op0) === op1);
-					break; // IN?
+				case 6: // IN? — parent(0) is 0, so `jin 0 0` is true.
+					predicate((op0 === 0 ? 0 : getParent(op0)) === op1);
+					break;
 				case 7:
 					predicate((op0 & op1) === op1);
 					break; // BTST
@@ -493,39 +499,55 @@ export class ZMachine {
 				case 9:
 					store(op0 & op1);
 					break; // BAND
-				case 10:
-					flagset();
-					predicate(!!(opc & op3));
-					break; // FSET?
-				case 11:
-					flagset();
-					mem.put(op2, opc | op3);
-					break; // FSET
-				case 12:
-					flagset();
-					mem.put(op2, opc & ~op3);
-					break; // FCLEAR
+				case 10: // FSET? — object 0 has no attributes.
+					if (op0 === 0) predicate(false);
+					else {
+						flagset();
+						predicate(!!(opc & op3));
+					}
+					break;
+				case 11: // FSET — no-op on object 0 (else would corrupt default-property table).
+					if (op0 !== 0) {
+						flagset();
+						mem.put(op2, opc | op3);
+					}
+					break;
+				case 12: // FCLEAR — no-op on object 0.
+					if (op0 !== 0) {
+						flagset();
+						mem.put(op2, opc & ~op3);
+					}
+					break;
 				case 13:
 					xstore(op0, op1);
 					break; // SET
-				case 14:
-					move(op0, op1);
-					break; // MOVE
+				case 14: // MOVE (insert_obj) — no-op when source is 0; dest 0 is valid (remove).
+					if (op0 !== 0) move(op0, op1);
+					break;
 				case 15:
 					store(mem.get((op0 + op1 * 2) & 65535));
 					break; // GET
 				case 16:
 					store(bytes[(op0 + op1) & 65535]!);
 					break; // GETB
-				case 17: // GETP
-					if (propfind()) store(op3Size === 2 ? mem.get(op3) : bytes[op3]!);
+				case 17: // GETP — obj 0 returns the prop's default value (never matches, so default applies).
+					if (op0 === 0) store(mem.get(defprop + 2 * op1));
+					else if (propfind()) store(op3Size === 2 ? mem.get(op3) : bytes[op3]!);
 					else store(mem.get(defprop + 2 * op1));
 					break;
-				case 18:
-					propfind();
-					store(op3);
-					break; // GETPT
+				case 18: // GETPT — obj 0 has no properties.
+					if (op0 === 0) store(0);
+					else {
+						propfind();
+						store(op3);
+					}
+					break;
 				case 19: // NEXTP
+					if (op0 === 0) {
+						// Object 0 has no properties.
+						store(0);
+						break;
+					}
 					if (op1) {
 						// Advance past the current property's data to the next header, return num.
 						propfind();
@@ -578,20 +600,23 @@ export class ZMachine {
 				case 128:
 					predicate(!op0);
 					break; // ZERO?
-				case 129: // NEXT?
-					store((x = getSibling(op0)));
+				case 129: // NEXT? (get_sibling)
+					x = op0 === 0 ? 0 : getSibling(op0);
+					store(x);
 					predicate(x);
 					break;
-				case 130: // FIRST?
-					store((x = getChild(op0)));
+				case 130: // FIRST? (get_child)
+					x = op0 === 0 ? 0 : getChild(op0);
+					store(x);
 					predicate(x);
 					break;
-				case 131:
-					store(getParent(op0));
-					break; // LOC
-				case 132:
-					store(propSizeAt(op0));
-					break; // PTSIZE
+				case 131: // LOC (get_parent)
+					store(op0 === 0 ? 0 : getParent(op0));
+					break;
+				case 132: // PTSIZE (get_prop_len)
+					// Z-Machine 1.1: get_prop_len 0 must return 0 (caught by Praxix specfixes).
+					store(op0 === 0 ? 0 : propSizeAt(op0));
+					break;
 				case 133:
 					x = xfetch(op0);
 					xstore(op0, x + 1);
@@ -603,12 +628,12 @@ export class ZMachine {
 				case 135:
 					await genPrint(decode(op0 & 65535));
 					break; // PRINTB
-				case 137:
-					move(op0, 0);
-					break; // REMOVE
-				case 138:
-					await genPrint(decode(getPropAddr(op0) + 1));
-					break; // PRINTD
+				case 137: // REMOVE (remove_obj) — no-op on object 0.
+					if (op0 !== 0) move(op0, 0);
+					break;
+				case 138: // PRINTD (print_obj) — no-op on object 0.
+					if (op0 !== 0) await genPrint(decode(getPropAddr(op0) + 1));
+					break;
 				case 139:
 					ret(op0);
 					break; // RETURN
