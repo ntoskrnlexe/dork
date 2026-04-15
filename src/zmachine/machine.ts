@@ -1,5 +1,5 @@
 import { Memory } from './memory.ts';
-import { decodeText, zsciiToChar, charToZscii } from './text.ts';
+import { decodeText, zsciiToChar, charToZscii, readUnicodeTable, DEFAULT_ZSCII_EXTRA } from './text.ts';
 import { Vocabulary } from './vocab.ts';
 import { serialize, deserialize, verify, type CallFrame } from './saves.ts';
 import type { ZMachineIO } from './io.ts';
@@ -31,6 +31,7 @@ export class ZMachine {
 	private seed = 0;
 	private fwords = 0;
 	private vocabulary: Vocabulary | null = null;
+	private zsciiExtra: string = DEFAULT_ZSCII_EXTRA;
 
 	constructor(story: ArrayLike<number>, io: ZMachineIO, opts: ZMachineOptions = {}) {
 		const bytes = new Uint8Array(story);
@@ -128,6 +129,10 @@ export class ZMachine {
 				// (v6/v7 only; zero in v5/v8).
 				routineOff = this.version === 7 ? mem.getu(40) * 8 : 0;
 				stringsOff = this.version === 7 ? mem.getu(42) * 8 : 0;
+				// v5+ may supply a custom ZSCII 155..223 translation via the header extension.
+				if (this.version >= 5) {
+					this.zsciiExtra = readUnicodeTable(mem) ?? DEFAULT_ZSCII_EXTRA;
+				}
 			}
 			mem.put(16, this.savedFlags);
 			this.fwords = mem.getu(24);
@@ -143,7 +148,7 @@ export class ZMachine {
 		};
 
 		const decode = (addr: number): string => {
-			const r = decodeText(mem, this.fwords, addr);
+			const r = decodeText(mem, this.fwords, addr, this.zsciiExtra);
 			endText = r.end;
 			return r.text;
 		};
@@ -401,7 +406,7 @@ export class ZMachine {
 				const top = stream3[stream3.length - 1]!;
 				// Memory streams want raw ZSCII, so reverse-translate the accented range.
 				for (let i = 0; i < text.length; i++) {
-					bytes[top.cursor++] = charToZscii(text.charCodeAt(i));
+					bytes[top.cursor++] = charToZscii(text.charCodeAt(i), this.zsciiExtra);
 				}
 				return;
 			}
@@ -738,7 +743,7 @@ export class ZMachine {
 					if (this.version >= 5) store(13); // 13 = newline; aread returns the terminator
 					break;
 				case 229: // PRINTC (print_char) — a raw ZSCII code (155-223 are accents).
-					await genPrint(zsciiToChar(op0));
+					await genPrint(zsciiToChar(op0, this.zsciiExtra));
 					break;
 				case 230:
 					await genPrint(String(op0));

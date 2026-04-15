@@ -6,22 +6,42 @@ const ALPHABET =
 /**
  * Default ZSCII → Unicode translation table for codes 155..223 per Z-Machine
  * Standards Document §3.8.3. v5+ games can override with a table in the header
- * extension at byte 0x34; we use defaults for now.
+ * extension (see `readUnicodeTable` below).
  */
-const ZSCII_EXTRA =
+export const DEFAULT_ZSCII_EXTRA =
 	'äöüÄÖÜß»«ëïÿËÏáéíóúýÁÉÍÓÚÝàèìòùÀÈÌÒÙâêîôûÂÊÎÔÛåÅøØãñõÃÑÕæÆçÇþðÞÐ£œŒ¡¿';
 
-/** Translate a raw ZSCII code to a single Unicode character. */
-export function zsciiToChar(code: number): string {
-	if (code === 13) return '\n';
-	if (code === 0) return '';
-	if (code >= 155 && code <= 223) return ZSCII_EXTRA[code - 155] ?? '';
-	return String.fromCharCode(code);
+/**
+ * Read a game-supplied Unicode translation table (v5+ header extension).
+ * Returns the 69-char table if present, or null to use defaults.
+ */
+export function readUnicodeTable(mem: Memory): string | null {
+	const extAddr = mem.getu(0x36);
+	if (extAddr === 0) return null;
+	const extLen = mem.getu(extAddr);
+	if (extLen < 3) return null;
+	const tableAddr = mem.getu(extAddr + 6);
+	if (tableAddr === 0) return null;
+	const count = mem.bytes[tableAddr]!;
+	let out = '';
+	// Custom tables may define up to 97 entries (ZSCII 155..251).
+	for (let i = 0; i < count && i < 97; i++) {
+		out += String.fromCharCode(mem.getu(tableAddr + 1 + i * 2));
+	}
+	// Pad any unfilled codes with defaults.
+	if (out.length < DEFAULT_ZSCII_EXTRA.length) {
+		out += DEFAULT_ZSCII_EXTRA.slice(out.length);
+	}
+	return out;
 }
 
-const UNICODE_TO_ZSCII = new Map<number, number>();
-for (let i = 0; i < ZSCII_EXTRA.length; i++) {
-	UNICODE_TO_ZSCII.set(ZSCII_EXTRA.charCodeAt(i), 155 + i);
+/** Translate a raw ZSCII code to a single Unicode character. */
+export function zsciiToChar(code: number, zsciiExtra: string = DEFAULT_ZSCII_EXTRA): string {
+	if (code === 13) return '\n';
+	if (code === 0) return '';
+	// Per §3.8.4, codes 155..251 are the extended (accent / custom) range.
+	if (code >= 155 && code <= 251) return zsciiExtra[code - 155] ?? '';
+	return String.fromCharCode(code);
 }
 
 /**
@@ -29,9 +49,12 @@ for (let i = 0; i < ZSCII_EXTRA.length; i++) {
  * Z-machine expects raw ZSCII bytes rather than Unicode codepoints. Unmapped
  * codepoints pass through (the caller masks to a byte).
  */
-export function charToZscii(code: number): number {
+export function charToZscii(code: number, zsciiExtra: string = DEFAULT_ZSCII_EXTRA): number {
 	if (code === 10) return 13;
-	return UNICODE_TO_ZSCII.get(code) ?? code;
+	for (let i = 0; i < zsciiExtra.length; i++) {
+		if (zsciiExtra.charCodeAt(i) === code) return 155 + i;
+	}
+	return code;
 }
 
 export interface DecodedText {
@@ -44,8 +67,14 @@ export interface DecodedText {
 /**
  * Decode Z-encoded text starting at `addr`.
  * @param fwords address of the abbreviation table (for shift-5 abbreviations).
+ * @param zsciiExtra 155..223 Unicode translation; defaults to the Z-spec default.
  */
-export function decodeText(mem: Memory, fwords: number, addr: number): DecodedText {
+export function decodeText(
+	mem: Memory,
+	fwords: number,
+	addr: number,
+	zsciiExtra: string = DEFAULT_ZSCII_EXTRA,
+): DecodedText {
 	let o = '';
 	let ps = 0; // permanent shift
 	let ts = 0; // temporary shift
@@ -57,10 +86,10 @@ export function decodeText(mem: Memory, fwords: number, addr: number): DecodedTe
 			ts = 4;
 		} else if (ts === 4) {
 			y += v;
-			o += zsciiToChar(y);
+			o += zsciiToChar(y, zsciiExtra);
 			ts = ps;
 		} else if (ts === 5) {
-			o += decodeText(mem, fwords, mem.getu(fwords + (y + v) * 2) * 2).text;
+			o += decodeText(mem, fwords, mem.getu(fwords + (y + v) * 2) * 2, zsciiExtra).text;
 			ts = ps;
 		} else if (v === 0) {
 			o += ' ';
