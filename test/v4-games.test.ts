@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { ZMachine, type ZMachineIO } from '../src/zmachine/index.ts';
 
-const STORY_DIR = '/home/beans/dork/zifmia/infocom';
+const STORY_DIR = '../zifmia/infocom';
 
 /** Minimal IO that captures output and returns blank input, then QUIT on the 6th read. */
 function scriptedIO(): { io: ZMachineIO; output: { value: string } } {
