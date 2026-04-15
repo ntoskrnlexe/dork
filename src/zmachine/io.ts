@@ -19,4 +19,6 @@ export interface ZMachineIO {
 	getCursor?(): readonly [number, number];
 	setTextStyle?(style: number): Promise<void> | void;
 	bufferMode?(buffering: boolean): Promise<void> | void;
+	/** v5+: foreground / background colour numbers per Z-machine standard 1.0 §8.3. 0/1 mean "current". */
+	setColour?(fg: number, bg: number): Promise<void> | void;
 }

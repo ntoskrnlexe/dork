@@ -35,12 +35,19 @@ export class Vocabulary {
 	/**
 	 * Writes the player's command into the Z-machine's text and parse buffers.
 	 * @param t1 text buffer address (max length at [t1]).
-	 * @param t2 parse buffer address (max tokens at [t2]).
+	 * @param t2 parse buffer address (max tokens at [t2]); 0 to skip tokenisation (v5+).
+	 * @param version Z-code version — v5+ stores chars at offset 2 with a length byte at +1.
 	 */
-	handleInput(mem: Memory, str: string, t1: number, t2: number): void {
+	handleInput(mem: Memory, str: string, t1: number, t2: number, version: number): void {
 		str = str.toLowerCase().slice(0, mem.bytes[t1]! - 1);
-		for (let i = 0; i < str.length; i++) mem.bytes[t1 + i + 1] = str.charCodeAt(i);
-		mem.bytes[t1 + str.length + 1] = 0;
+		const textOffset = version >= 5 ? 2 : 1;
+		for (let i = 0; i < str.length; i++) mem.bytes[t1 + textOffset + i] = str.charCodeAt(i);
+		if (version >= 5) {
+			mem.bytes[t1 + 1] = str.length;
+		} else {
+			mem.bytes[t1 + str.length + 1] = 0;
+		}
+		if (t2 === 0) return; // v5: parse buffer omitted means "don't tokenise"
 
 		const truncate = (x: string): string => {
 			let i = 0;

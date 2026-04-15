@@ -4,6 +4,10 @@ export interface CallFrame {
 	local: Int16Array;
 	pc: number;
 	ds: number[];
+	/** v5+: true for call_vn/call_vn2/call_1n/call_2n — return value is dropped, not stored. */
+	discardResult: boolean;
+	/** Number of arguments actually passed to this routine (for v5 check_arg_count). */
+	argCount: number;
 }
 
 /**
@@ -36,7 +40,10 @@ export function serialize(mem: Memory, ds: number[], cs: CallFrame[], pc: number
 	for (let i = 0; i < cs.length; i++) {
 		const f = cs[i]!;
 		vi.setUint32(e, f.pc);
-		vi.setUint8(e, f.local.length);
+		// `localByte` reuses the high byte of the pc word: low 4 bits = local count
+		// (max 15), bit 7 = discardResult flag (always 0 for v3/v4 saves, so old
+		// save files keep working).
+		vi.setUint8(e, f.local.length | (f.discardResult ? 0x80 : 0));
 		vi.setUint16(e + 4, f.ds.length);
 		for (let j = 0; j < f.ds.length; j++) vi.setInt16(e + j * 2 + 6, f.ds[j]!);
 		for (let j = 0; j < f.local.length; j++)
@@ -60,11 +67,15 @@ export function deserialize(mem: Memory, ar: Uint8Array): [number[], CallFrame[]
 		const cs: CallFrame[] = Array.from({ length: g16() });
 		const ds: number[] = Array.from({ length: g16() }, g16s);
 		for (let i = 0; i < cs.length; i++) {
-			const local = new Int16Array(g8());
+			const localByte = g8();
+			const local = new Int16Array(localByte & 0x7f);
+			const discardResult = !!(localByte & 0x80);
 			const framePc = g24();
 			const dsFrame = Array.from({ length: g16() }, g16s);
 			for (let j = 0; j < local.length; j++) local[j] = g16s();
-			cs[i] = { local, pc: framePc, ds: dsFrame };
+			// argCount isn't serialized (would break wire-compat with v3/v4 saves);
+			// default to localCount, which is conservative for check_arg_count.
+			cs[i] = { local, pc: framePc, ds: dsFrame, discardResult, argCount: local.length };
 		}
 		const purbot = mem.getu(14);
 		mem.bytes.set(new Uint8Array(ar.buffer, 0, purbot));

@@ -13,7 +13,7 @@ export interface ZMachineOptions {
  * Z-machine v3 interpreter. Story file goes in; calls into `io` come out.
  * Port of public-domain JSZM (by zzo38) to async/await + TypeScript.
  */
-export type ZVersion = 3 | 4;
+export type ZVersion = 3 | 4 | 5;
 
 export class ZMachine {
 	readonly memInit: Uint8Array;
@@ -36,7 +36,9 @@ export class ZMachine {
 		const bytes = new Uint8Array(story);
 		this.memInit = bytes;
 		const v = bytes[0];
-		if (v !== 3 && v !== 4) throw new Error(`Unsupported Z-code version ${String(v)}.`);
+		if (v !== 3 && v !== 4 && v !== 5) {
+			throw new Error(`Unsupported Z-code version ${String(v)}.`);
+		}
 		this.version = v as ZVersion;
 		this.byteSwapped = !!(bytes[1]! & 1);
 		this.statusType = !!(bytes[1]! & 2);
@@ -108,14 +110,20 @@ export class ZMachine {
 				if (!this.io.updateStatusLine) bytes[1]! |= 16;
 				if (this.io.splitWindow && this.io.setWindow) bytes[1]! |= 32;
 			} else {
-				// v4 flags1: bit 2=bold, bit 3=italic, bit 4=fixed-pitch, bit 7=timed input.
-				// We can render bold/italic/fixed via ANSI; timers not yet implemented.
-				bytes[1]! = 0b0001_1100;
-				// Header extras expected by v4 games.
+				// v4: bits 2/3/4 (bold/italic/fixed). v5: also bit 0 (colour).
+				bytes[1]! = this.version >= 5 ? 0b0001_1101 : 0b0001_1100;
 				bytes[30] = 0; // interpreter number
 				bytes[31] = 0; // interpreter version
 				bytes[32] = 25; // screen height in lines
 				bytes[33] = 80; // screen width in characters
+				if (this.version >= 5) {
+					mem.putu(34, 80); // screen width in units
+					mem.putu(36, 25); // screen height in units
+					bytes[38] = 1; // font width in units
+					bytes[39] = 1; // font height in units
+					bytes[44] = 9; // default background = white
+					bytes[45] = 2; // default foreground = black
+				}
 			}
 			mem.put(16, this.savedFlags);
 			this.fwords = mem.getu(24);
@@ -173,10 +181,12 @@ export class ZMachine {
 		};
 
 		const ret = (x: number): void => {
-			ds = cs[0]!.ds;
-			pc = cs[0]!.pc;
+			const frame = cs[0]!;
+			ds = frame.ds;
+			pc = frame.pc;
 			cs.shift();
-			store(x);
+			// No-store call variants drop the return value instead of reading a store byte.
+			if (!frame.discardResult) store(x);
 		};
 
 		const predicate = (p: boolean | number): void => {
@@ -299,20 +309,30 @@ export class ZMachine {
 			return opDispatch[x]!();
 		};
 
-		// Shared CALL-and-store logic for call_vs / call_1s / call_2s / call_vs2.
+		// Shared CALL logic for the eight call variants.
 		// `opc` must already reflect the total operand count (routine + args).
-		const doCall = (): void => {
+		// `storeResult=false` for the v5 call_vn / call_vn2 / call_1n / call_2n forms.
+		const doCall = (storeResult: boolean): void => {
 			if (!op0) {
-				store(0);
+				if (storeResult) store(0);
 				return;
 			}
 			const fn = addr(op0);
 			const localCount = bytes[fn]!;
-			cs.unshift({ ds, pc, local: new Int16Array(localCount) });
+			cs.unshift({
+				ds,
+				pc,
+				local: new Int16Array(localCount),
+				discardResult: !storeResult,
+				argCount: opc - 1, // operand 0 is the routine; operands 1..opc-1 are args
+			});
 			ds = [];
 			pc = fn + 1;
 			const locals = cs[0]!.local;
-			for (let i = 0; i < localCount; i++) locals[i] = pcget();
+			// v3/v4 routines store default local values in the header; v5+ they default to 0.
+			if (this.version <= 4) {
+				for (let i = 0; i < localCount; i++) locals[i] = pcget();
+			}
 			if (opc > 1 && localCount > 0) locals[0] = op1;
 			if (opc > 2 && localCount > 1) locals[1] = op2;
 			if (opc > 3 && localCount > 2) locals[2] = op3;
@@ -383,6 +403,15 @@ export class ZMachine {
 				else if (x === 1) op0 = pcgetb();
 				else if (x === 2) op0 = pcfetch();
 				opc = 1;
+			} else if (inst === 190 && this.version >= 5) {
+				// Extended-opcode prefix (v5+). The real opcode follows; operands like VAR.
+				// Stash extended cases as 256+N in the switch.
+				inst = 256 + pcgetb();
+				const x = pcgetb();
+				op0 = opfetch(x >> 6, 1);
+				op1 = opfetch(x >> 4, 2);
+				op2 = opfetch(x >> 2, 3);
+				op3 = opfetch(x >> 0, 4);
 			} else if (inst >= 192) {
 				// EXT (VAR / 2OP long form). call_vs2 (236) and call_vn2 (250) have
 				// TWO operand-types bytes up front, both read before any operand bytes.
@@ -503,6 +532,19 @@ export class ZMachine {
 					store(op0 % op1);
 					break; // MOD
 
+				// v5+ 2OP additions.
+				case 26: // call_2n — call routine with 1 arg, no store
+					doCall(false);
+					break;
+				case 27: // set_colour — fg=op0, bg=op1 (colour numbers per spec)
+					if (this.io.setColour) await this.io.setColour(op0, op1);
+					break;
+				case 28: { // throw — return value op0 from frame number op1
+					while (cs.length > op1) cs.shift();
+					ret(op0);
+					break;
+				}
+
 				case 128:
 					predicate(!op0);
 					break; // ZERO?
@@ -549,9 +591,13 @@ export class ZMachine {
 				case 142:
 					store(xfetch(op0));
 					break; // VALUE
-				case 143:
-					store(~op0);
-					break; // BCOM
+				case 143: // v3-4: BCOM (~op0); v5: call_1n (call, no-store)
+					if (this.version <= 4) store(~op0);
+					else {
+						opc = 1;
+						doCall(false);
+					}
+					break;
 
 				case 176:
 					ret(1);
@@ -594,9 +640,10 @@ export class ZMachine {
 				case 184:
 					ret(ds[ds.length - 1]!);
 					break; // RSTACK
-				case 185:
-					ds.pop();
-					break; // FSTACK
+				case 185: // v3-4: FSTACK (pop top of stack); v5: CATCH (push current frame number)
+					if (this.version <= 4) ds.pop();
+					else store(cs.length);
+					break;
 				case 186:
 					return; // QUIT
 				case 187:
@@ -608,16 +655,15 @@ export class ZMachine {
 				case 189:
 					predicate(this.verify());
 					break; // VERIFY
+				case 191: // piracy (v5+) — branch if "genuine"; we always say yes
+					predicate(true);
+					break;
 
 				case 25: // call_2s (2OP:25) — call routine with 1 arg, store result
 				case 224: // call_vs / call (VAR:224)
-					doCall();
-					break;
 				case 136: // call_1s (1OP:136) — call routine with no args, store result
-					doCall();
-					break;
 				case 236: // call_vs2 (VAR:236) — call with up to 7 args, store result
-					doCall();
+					doCall(true);
 					break;
 				case 225:
 					mem.put((op0 + op1 * 2) & 65535, op2);
@@ -630,15 +676,17 @@ export class ZMachine {
 					if (op3Size === 2) mem.put(op3, op2);
 					else bytes[op3] = op2;
 					break;
-				case 228: // READ
+				case 228: // sread (v3/v4) / aread (v5: stores the terminator code)
 					await genPrint('');
 					await refreshStatus();
 					this.vocabulary!.handleInput(
 						mem,
 						await this.io.read(bytes[op0 & 65535]!),
 						op0 & 65535,
-						op1 & 65535
+						op1 & 65535,
+						this.version,
 					);
+					if (this.version >= 5) store(13); // 13 = newline; aread returns the terminator
 					break;
 				case 229: // PRINTC
 					await genPrint(op0 === 13 ? '\n' : op0 ? String.fromCharCode(op0) : '');
@@ -740,8 +788,118 @@ export class ZMachine {
 					break;
 				}
 
+				// v5+ VAR opcodes.
+				case 248: // not (moved here from 1OP:143)
+					store(~op0);
+					break;
+				case 249: // call_vn — call with up to 3 args, no store
+					doCall(false);
+					break;
+				case 250: // call_vn2 — call with up to 7 args, no store
+					doCall(false);
+					break;
+				case 251: // tokenise text parse [dict [flag]]
+					this.vocabulary!.handleInput(
+						mem,
+						String.fromCharCode(...bytes.slice(op0 + 2, op0 + 2 + bytes[op0 + 1]!)),
+						op0 & 0xffff,
+						op1 & 0xffff,
+						this.version,
+					);
+					break;
+				case 252: // encode_text — not yet implemented; write zeros so callers don't get garbage
+					mem.put((op3 + 0) & 0xffff, 0);
+					mem.put((op3 + 2) & 0xffff, 0);
+					mem.put((op3 + 4) & 0xffff, 0);
+					break;
+				case 253: { // copy_table src, dst, size
+					const src = op0 & 0xffff;
+					const dst = op1 & 0xffff;
+					const size = (op2 << 16) >> 16;
+					if (dst === 0) {
+						// Zero out src for |size| bytes.
+						const n = Math.abs(size);
+						for (let i = 0; i < n; i++) bytes[(src + i) & 0xffff] = 0;
+					} else if (size < 0 || dst < src || dst >= src + size) {
+						// Forward copy is safe.
+						for (let i = 0; i < Math.abs(size); i++)
+							bytes[(dst + i) & 0xffff] = bytes[(src + i) & 0xffff]!;
+					} else {
+						// Overlap: copy backwards.
+						for (let i = size - 1; i >= 0; i--)
+							bytes[(dst + i) & 0xffff] = bytes[(src + i) & 0xffff]!;
+					}
+					break;
+				}
+				case 254: { // print_table text, width [height [skip]]
+					const table = op0 & 0xffff;
+					const width = op1;
+					const height = opc >= 3 ? op2 : 1;
+					const skip = opc >= 4 ? op3 : 0;
+					let p = table;
+					for (let row = 0; row < height; row++) {
+						let line = '';
+						for (let col = 0; col < width; col++) line += String.fromCharCode(bytes[p++]!);
+						await genPrint(line);
+						if (row < height - 1) await genPrint('\n');
+						p += skip;
+					}
+					break;
+				}
+				case 255: // check_arg_count N — branch if at least N args were given
+					predicate(cs[0] !== undefined && op0 <= cs[0].argCount);
+					break;
+
+				// Extended (0xBE) opcodes — switch dispatch is offset by +256.
+				case 256: // ext:save (v5: stores 0/1/2 instead of branching)
+					this.savedFlags = mem.get(16);
+					store(this.io.save ? ((await this.io.save(serialize(mem, ds, cs, pc))) ? 1 : 0) : 0);
+					break;
+				case 257: { // ext:restore
+					this.savedFlags = mem.get(16);
+					z = this.io.restore ? await this.io.restore() : null;
+					const restored = z ? deserialize(mem, z) : null;
+					mem.put(16, this.savedFlags);
+					if (restored) {
+						ds = restored[0];
+						cs = restored[1];
+						pc = restored[2];
+					}
+					store(restored ? 2 : 0);
+					break;
+				}
+				case 258: { // ext:log_shift  value, places (negative = right shift)
+					const places = (op1 << 16) >> 16;
+					const u = op0 & 0xffff;
+					store(places >= 0 ? (u << places) & 0xffff : u >>> -places);
+					break;
+				}
+				case 259: { // ext:art_shift — arithmetic shift (sign-preserving for right)
+					const places = (op1 << 16) >> 16;
+					const s = (op0 << 16) >> 16;
+					store(places >= 0 ? (s << places) & 0xffff : s >> -places);
+					break;
+				}
+				case 260: // ext:set_font — return previous font (1 = normal). We don't switch fonts.
+					store(op0 === 0 ? 1 : op0 === 1 ? 1 : 0);
+					break;
+				case 265: // ext:save_undo — not implemented; per spec store -1
+					store(-1);
+					break;
+				case 266: // ext:restore_undo
+					store(-1);
+					break;
+				case 267: // ext:print_unicode — print a Unicode codepoint
+					await genPrint(String.fromCodePoint(op0));
+					break;
+				case 268: // ext:check_unicode — return support flags. Bit 0 = can print, bit 1 = can read.
+					store(0b01);
+					break;
+
 				default:
-					throw new Error(`ZMachine: invalid opcode ${inst} at pc=${pc - 1}`);
+					throw new Error(
+						`ZMachine: invalid opcode ${inst >= 256 ? 'EXT:' + (inst - 256) : inst} at pc=${pc - 1}`,
+					);
 			}
 		}
 	}
