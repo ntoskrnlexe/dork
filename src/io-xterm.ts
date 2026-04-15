@@ -5,6 +5,9 @@ const WINDOW_LOWER = 0;
 const WINDOW_UPPER = 1;
 
 export class XtermIO implements ZMachineIO {
+	save?: (bytes: Uint8Array) => Promise<boolean>;
+	restore?: () => Promise<Uint8Array | null>;
+
 	private readonly term: Terminal;
 	private readonly statusEl: HTMLElement | null;
 	private readonly upperEl: HTMLElement | null;
@@ -30,6 +33,12 @@ export class XtermIO implements ZMachineIO {
 		this.statusEl = statusEl;
 		this.upperEl = upperEl;
 		this.dataDisposable = term.onData((d) => this.handleInput(d));
+	}
+
+	/** Print a message and await one line of input — for modal-style prompts. */
+	async prompt(message: string): Promise<string> {
+		this.print(message);
+		return this.read();
 	}
 
 	dispose(): void {
@@ -259,31 +268,4 @@ export class XtermIO implements ZMachineIO {
 		this.buffering = buffering;
 	}
 
-	save(buf: Uint8Array): boolean {
-		try {
-			// Avoid String.fromCharCode(...buf) — spread has an argument-count limit
-			// (~100k in most engines) and save buffers can exceed that.
-			let s = '';
-			for (let i = 0; i < buf.length; i += 0x8000) {
-				s += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000) as unknown as number[]);
-			}
-			localStorage.setItem('dork.save', btoa(s));
-			return true;
-		} catch {
-			return false;
-		}
-	}
-
-	restore(): Uint8Array | null {
-		const b64 = localStorage.getItem('dork.save');
-		if (!b64) return null;
-		try {
-			const bin = atob(b64);
-			const arr = new Uint8Array(bin.length);
-			for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-			return arr;
-		} catch {
-			return null;
-		}
-	}
 }

@@ -2,6 +2,8 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { ZMachine } from './zmachine/index.ts';
 import { XtermIO } from './io-xterm.ts';
+import { LocalStorageSaveStorage } from './save-storage.ts';
+import { createSavePrompt } from './save-prompt.ts';
 
 const DEFAULT_STORY = '/zork1.zip';
 
@@ -46,6 +48,13 @@ async function main(): Promise<void> {
 		if (storyNameEl) storyNameEl.textContent = name;
 
 		const io = new XtermIO(term, statusEl, upperEl);
+		const storage = new LocalStorageSaveStorage(`dork.save.${name}`);
+		const { save, restore } = createSavePrompt(storage, {
+			print: (t) => io.print(t),
+			prompt: (m) => io.prompt(m),
+		});
+		io.save = save;
+		io.restore = restore;
 		currentIO = io;
 		const zm = new ZMachine(story, io);
 		try {
