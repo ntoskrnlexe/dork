@@ -697,7 +697,9 @@ export class ZMachine {
 					const sid = op0 << 16 >> 16; // sign-extend to int16
 					if (sid === 3) {
 						// Open memory stream; op1 = table address. Reserve first 2 bytes for length.
-						stream3.push({ base: op1, cursor: op1 + 2 });
+						// Mask to unsigned 16 — operand comes in as int16 and tables live above 0x8000.
+						const base = op1 & 0xffff;
+						stream3.push({ base, cursor: base + 2 });
 					} else if (sid === -3) {
 						// Close top memory stream; write length back to the first 2 bytes.
 						const top = stream3.pop();
