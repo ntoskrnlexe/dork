@@ -13,7 +13,7 @@ export interface ZMachineOptions {
  * Z-machine v3 interpreter. Story file goes in; calls into `io` come out.
  * Port of public-domain JSZM (by zzo38) to async/await + TypeScript.
  */
-export type ZVersion = 3 | 4 | 5;
+export type ZVersion = 3 | 4 | 5 | 7 | 8;
 
 export class ZMachine {
 	readonly memInit: Uint8Array;
@@ -36,7 +36,7 @@ export class ZMachine {
 		const bytes = new Uint8Array(story);
 		this.memInit = bytes;
 		const v = bytes[0];
-		if (v !== 3 && v !== 4 && v !== 5) {
+		if (v !== 3 && v !== 4 && v !== 5 && v !== 7 && v !== 8) {
 			throw new Error(`Unsupported Z-code version ${String(v)}.`);
 		}
 		this.version = v as ZVersion;
@@ -110,7 +110,7 @@ export class ZMachine {
 				if (!this.io.updateStatusLine) bytes[1]! |= 16;
 				if (this.io.splitWindow && this.io.setWindow) bytes[1]! |= 32;
 			} else {
-				// v4: bits 2/3/4 (bold/italic/fixed). v5: also bit 0 (colour).
+				// v4: bits 2/3/4 (bold/italic/fixed). v5+: also bit 0 (colour).
 				bytes[1]! = this.version >= 5 ? 0b0001_1101 : 0b0001_1100;
 				bytes[30] = 0; // interpreter number
 				bytes[31] = 0; // interpreter version
@@ -124,6 +124,10 @@ export class ZMachine {
 					bytes[44] = 9; // default background = white
 					bytes[45] = 2; // default foreground = black
 				}
+				// v7 packs routine and string addresses with separate base offsets
+				// (v6/v7 only; zero in v5/v8).
+				routineOff = this.version === 7 ? mem.getu(40) * 8 : 0;
+				stringsOff = this.version === 7 ? mem.getu(42) * 8 : 0;
 			}
 			mem.put(16, this.savedFlags);
 			this.fwords = mem.getu(24);
@@ -144,9 +148,30 @@ export class ZMachine {
 			return r.text;
 		};
 
-		// v3 packs addresses by 2 (shift 1); v4/v5 pack by 4 (shift 2).
-		const packShift = this.version === 3 ? 1 : 2;
-		const addr = (x: number): number => (x & 65535) << packShift;
+		// Packed-address scaling:
+		//   v3:   packed × 2
+		//   v4-5: packed × 4
+		//   v7:   packed × 4 + (per-type offset × 8); routines and strings have separate offsets
+		//   v8:   packed × 8
+		// v7 offsets are read from the header during init() and captured below.
+		let routineOff = 0;
+		let stringsOff = 0;
+		const packedRoutine =
+			this.version === 3
+				? (x: number) => (x & 0xffff) << 1
+				: this.version === 8
+					? (x: number) => (x & 0xffff) << 3
+					: this.version === 7
+						? (x: number) => ((x & 0xffff) << 2) + routineOff
+						: (x: number) => (x & 0xffff) << 2;
+		const packedString =
+			this.version === 3
+				? (x: number) => (x & 0xffff) << 1
+				: this.version === 8
+					? (x: number) => (x & 0xffff) << 3
+					: this.version === 7
+						? (x: number) => ((x & 0xffff) << 2) + stringsOff
+						: (x: number) => (x & 0xffff) << 2;
 
 		const pcgetb = (): number => bytes[pc++]!;
 		const pcget = (): number => {
@@ -317,7 +342,7 @@ export class ZMachine {
 				if (storeResult) store(0);
 				return;
 			}
-			const fn = addr(op0);
+			const fn = packedRoutine(op0);
 			const localCount = bytes[fn]!;
 			cs.unshift({
 				ds,
@@ -600,9 +625,9 @@ export class ZMachine {
 				case 140:
 					pc += op0 - 2;
 					break; // JUMP
-				case 141:
-					await genPrint(decode(addr(op0)));
-					break; // PRINT
+				case 141: // PRINT_PADDR — print string at a packed string address
+					await genPrint(decode(packedString(op0)));
+					break;
 				case 142:
 					store(xfetch(op0));
 					break; // VALUE

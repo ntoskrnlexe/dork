@@ -32,7 +32,7 @@ function normalize(text: string): string {
 		.trim();
 }
 
-async function conformanceCheck(version: 3 | 4 | 5): Promise<void> {
+async function conformanceCheck(version: 3 | 4 | 5 | 8): Promise<void> {
 	const actual = await runCzech(`test/fixtures/czech.z${version}`);
 	const expected = await Bun.file(`test/fixtures/czech.out${version}`).text();
 	await Bun.write(`test/czech.actual${version}.txt`, actual);
@@ -48,3 +48,4 @@ async function conformanceCheck(version: 3 | 4 | 5): Promise<void> {
 test('CZECH conformance at v3', () => conformanceCheck(3), 30_000);
 test('CZECH conformance at v4', () => conformanceCheck(4), 30_000);
 test('CZECH conformance at v5', () => conformanceCheck(5), 30_000);
+test('CZECH conformance at v8', () => conformanceCheck(8), 30_000);
