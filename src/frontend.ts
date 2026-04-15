@@ -29,6 +29,7 @@ async function main(): Promise<void> {
 	window.addEventListener('resize', () => fit.fit());
 
 	const statusEl = document.getElementById('status');
+	const upperEl = document.getElementById('upper-window');
 	const storyNameEl = document.getElementById('story-name');
 	const storyInput = document.getElementById('story-input') as HTMLInputElement | null;
 	const restartBtn = document.getElementById('restart');
@@ -44,7 +45,7 @@ async function main(): Promise<void> {
 		currentName = name;
 		if (storyNameEl) storyNameEl.textContent = name;
 
-		const io = new XtermIO(term, statusEl);
+		const io = new XtermIO(term, statusEl, upperEl);
 		currentIO = io;
 		const zm = new ZMachine(story, io);
 		try {

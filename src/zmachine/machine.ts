@@ -106,7 +106,7 @@ export class ZMachine {
 				bytes[1]! &= 3;
 				if (this.isTandy) bytes[1]! |= 8;
 				if (!this.io.updateStatusLine) bytes[1]! |= 16;
-				if (this.io.screen && this.io.split) bytes[1]! |= 32;
+				if (this.io.splitWindow && this.io.setWindow) bytes[1]! |= 32;
 			} else {
 				// v4 flags1: bit 2=bold, bit 3=italic, bit 4=fixed-pitch, bit 7=timed input.
 				// We can render bold/italic/fixed via ANSI; timers not yet implemented.
@@ -638,23 +638,35 @@ export class ZMachine {
 				case 233:
 					xstore(op0, ds.pop()!);
 					break; // POP
-				case 234:
-					if (this.io.split) await this.io.split(op0);
-					break; // SPLIT
-				case 235:
-					if (this.io.screen) await this.io.screen(op0);
-					break; // SCREEN
+				case 234: // split_window
+					if (this.io.splitWindow) await this.io.splitWindow(op0);
+					break;
+				case 235: // set_window
+					if (this.io.setWindow) await this.io.setWindow(op0);
+					break;
 
-				// v4+ opcodes. Most are screen/IO concerns that xterm can't render yet;
-				// stub them so v4 games don't crash, but note: interactive v4 games that
-				// lean on these (upper window, cursor addressing) won't look right yet.
 				case 237: // erase_window
+					if (this.io.eraseWindow) await this.io.eraseWindow((op0 << 16) >> 16);
+					break;
 				case 238: // erase_line
-				case 239: // set_cursor
-				case 240: // get_cursor
+					if (this.io.eraseLine) await this.io.eraseLine(op0);
+					break;
+				case 239: // set_cursor y x
+					if (this.io.setCursor) await this.io.setCursor(op0, op1);
+					break;
+				case 240: { // get_cursor → [y, x] written to table at op0
+					const [y, x] = this.io.getCursor?.() ?? [1, 1];
+					mem.putu(op0 & 65535, y);
+					mem.putu((op0 + 2) & 65535, x);
+					break;
+				}
 				case 241: // set_text_style
-				case 242: // buffer_mode
-				case 245: // sound_effect
+					if (this.io.setTextStyle) await this.io.setTextStyle(op0);
+					break;
+				case 242: // buffer_mode — 0 = unbuffered, non-zero = buffered
+					if (this.io.bufferMode) await this.io.bufferMode(op0 !== 0);
+					break;
+				case 245: // sound_effect — not yet implemented
 					break;
 
 				case 243: { // output_stream

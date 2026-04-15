@@ -52,6 +52,18 @@
 			#toolbar button:hover {
 				background: #333;
 			}
+			#upper-window {
+				background: #000;
+				color: #ddd;
+				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+				font-size: 14px;
+				line-height: 1.3;
+				white-space: pre;
+				overflow: hidden;
+				display: none;
+				padding: 0 4px;
+				border-bottom: 1px solid #333;
+			}
 			#terminal {
 				flex: 1 1 auto;
 				min-height: 0;
@@ -73,6 +85,7 @@
 			<span id="story-name" style="margin-left: auto"></span>
 		</div>
 		<div id="status">&nbsp;</div>
+		<pre id="upper-window"></pre>
 		<div id="terminal"></div>
 		<script type="module" src="./frontend.ts"></script>
 	</body>
