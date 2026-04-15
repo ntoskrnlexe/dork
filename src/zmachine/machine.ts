@@ -1,5 +1,5 @@
 import { Memory } from './memory.ts';
-import { decodeText } from './text.ts';
+import { decodeText, zsciiToChar, charToZscii } from './text.ts';
 import { Vocabulary } from './vocab.ts';
 import { serialize, deserialize, verify, type CallFrame } from './saves.ts';
 import type { ZMachineIO } from './io.ts';
@@ -399,10 +399,9 @@ export class ZMachine {
 		const genPrint = async (text: string): Promise<void> => {
 			if (stream3.length > 0) {
 				const top = stream3[stream3.length - 1]!;
-				// v3/v4 store each printed character as a ZSCII byte (newline → 13).
+				// Memory streams want raw ZSCII, so reverse-translate the accented range.
 				for (let i = 0; i < text.length; i++) {
-					const c = text.charCodeAt(i);
-					bytes[top.cursor++] = c === 10 ? 13 : c;
+					bytes[top.cursor++] = charToZscii(text.charCodeAt(i));
 				}
 				return;
 			}
@@ -738,8 +737,8 @@ export class ZMachine {
 					);
 					if (this.version >= 5) store(13); // 13 = newline; aread returns the terminator
 					break;
-				case 229: // PRINTC
-					await genPrint(op0 === 13 ? '\n' : op0 ? String.fromCharCode(op0) : '');
+				case 229: // PRINTC (print_char) — a raw ZSCII code (155-223 are accents).
+					await genPrint(zsciiToChar(op0));
 					break;
 				case 230:
 					await genPrint(String(op0));

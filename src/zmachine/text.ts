@@ -3,6 +3,37 @@ import type { Memory } from './memory.ts';
 const ALPHABET =
 	'abcdefghijklmnopqrstuvwxyz' + 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' + '*\n0123456789.,!?_#\'"/\\-:()';
 
+/**
+ * Default ZSCII → Unicode translation table for codes 155..223 per Z-Machine
+ * Standards Document §3.8.3. v5+ games can override with a table in the header
+ * extension at byte 0x34; we use defaults for now.
+ */
+const ZSCII_EXTRA =
+	'äöüÄÖÜß»«ëïÿËÏáéíóúýÁÉÍÓÚÝàèìòùÀÈÌÒÙâêîôûÂÊÎÔÛåÅøØãñõÃÑÕæÆçÇþðÞÐ£œŒ¡¿';
+
+/** Translate a raw ZSCII code to a single Unicode character. */
+export function zsciiToChar(code: number): string {
+	if (code === 13) return '\n';
+	if (code === 0) return '';
+	if (code >= 155 && code <= 223) return ZSCII_EXTRA[code - 155] ?? '';
+	return String.fromCharCode(code);
+}
+
+const UNICODE_TO_ZSCII = new Map<number, number>();
+for (let i = 0; i < ZSCII_EXTRA.length; i++) {
+	UNICODE_TO_ZSCII.set(ZSCII_EXTRA.charCodeAt(i), 155 + i);
+}
+
+/**
+ * Inverse of `zsciiToChar` — used when writing to a memory stream, where the
+ * Z-machine expects raw ZSCII bytes rather than Unicode codepoints. Unmapped
+ * codepoints pass through (the caller masks to a byte).
+ */
+export function charToZscii(code: number): number {
+	if (code === 10) return 13;
+	return UNICODE_TO_ZSCII.get(code) ?? code;
+}
+
 export interface DecodedText {
 	/** The decoded text. */
 	text: string;
@@ -26,8 +57,7 @@ export function decodeText(mem: Memory, fwords: number, addr: number): DecodedTe
 			ts = 4;
 		} else if (ts === 4) {
 			y += v;
-			if (y === 13) o += '\n';
-			else if (y) o += String.fromCharCode(y);
+			o += zsciiToChar(y);
 			ts = ps;
 		} else if (ts === 5) {
 			o += decodeText(mem, fwords, mem.getu(fwords + (y + v) * 2) * 2).text;
