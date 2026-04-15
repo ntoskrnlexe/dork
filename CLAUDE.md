@@ -103,3 +103,17 @@ bun --hot ./index.ts
 ```
 
 For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+
+## Lint & format
+
+- `bun run lint` — oxlint with `--type-aware`. Must pass before calling work done.
+- oxfmt auto-formats (tabs, single quotes, trailing-comma off). Write code in that style from the start; don't hand-format.
+
+## Z-machine development
+
+- Story file: `../zork1/zork1.zip` (Infocom Z-machine v3, Release 119).
+- Reference interpreter: `dfrotz` (dumb frontend). Regenerate golden transcript:
+  `dfrotz -p -m -Z 0 -s <seed> -w 80 ../zork1/zork1.zip < commands.txt > zork1.script.expected.txt`
+- `zork1.script.txt` is a 365-command walkthrough. Lines starting with `#` are test-harness directives (e.g. `#random -2` = PRNG seed), not game commands.
+- PRNG algorithms differ between interpreters — byte-exact transcript match only holds until the first random event (songbird chirp in Zork, ~263 words in).
+- `test/actual.txt` is a debug dump written by the regression test; gitignored.
