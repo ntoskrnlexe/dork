@@ -215,41 +215,52 @@ export class ZMachine {
 		};
 
 		/**
-		 * Decode a property header at `header`. Returns the property number, the total
-		 * byte length of the data, and the offset (1 or 2) from `header` to the data.
-		 * v3: 1-byte header, `(size-1)<<5 | (num-1)`, num in 1..31, size in 1..8.
+		 * Decode a property header at `header`, writing its fields into `pNum`/`pSize`/
+		 * `pDataOff` (scratch vars shared across calls to avoid a tuple allocation in
+		 * the propfind hot path).
+		 * v3: 1-byte header `(size-1)<<5 | num`, num in 1..31, size in 1..8.
 		 * v4: 1 or 2-byte header. If high bit set, 2-byte form: [0x80|num][0xC0|size]
 		 *     (with size==0 meaning 64). Else 1-byte form: bit 6 ⇒ size=2, else size=1.
 		 */
-		const propLayout = (header: number): [num: number, size: number, dataOffset: number] => {
+		let pNum = 0, pSize = 0, pDataOff = 0;
+		const propLayout = (header: number): void => {
 			const b1 = bytes[header]!;
-			if (v3) return [b1 & 31, (b1 >> 5) + 1, 1];
-			if (b1 & 0x80) {
-				const sz = bytes[header + 1]! & 0x3f;
-				return [b1 & 0x3f, sz || 64, 2];
+			if (v3) {
+				pNum = b1 & 31;
+				pSize = (b1 >> 5) + 1;
+				pDataOff = 1;
+				return;
 			}
-			return [b1 & 0x3f, b1 & 0x40 ? 2 : 1, 1];
+			pNum = b1 & 0x3f;
+			if (b1 & 0x80) {
+				pSize = (bytes[header + 1]! & 0x3f) || 64;
+				pDataOff = 2;
+			} else {
+				pSize = b1 & 0x40 ? 2 : 1;
+				pDataOff = 1;
+			}
 		};
 
-		/** Size of the property whose data starts at `dataAddr` (v3/v4 formats differ). */
+		/** Size of the property whose data starts at `dataAddr`. */
 		const propSizeAt = (dataAddr: number): number => {
-			const sb = bytes[(dataAddr - 1) & 65535]!;
-			if (v3) return (sb >> 5) + 1;
-			if (sb & 0x80) return (sb & 0x3f) || 64;
-			return sb & 0x40 ? 2 : 1;
+			const back1 = bytes[(dataAddr - 1) & 65535]!;
+			if (v3) return (back1 >> 5) + 1;
+			// v4: if top bit set, dataAddr-1 is the 2nd size byte, header is at dataAddr-2.
+			propLayout((back1 & 0x80 ? dataAddr - 2 : dataAddr - 1) & 65535);
+			return pSize;
 		};
 
 		const propfind = (): boolean => {
 			let z = getPropAddr(op0);
 			z += bytes[z]! * 2 + 1; // skip short name (length prefix in words)
 			while (bytes[z]) {
-				const [num, size, dataOffset] = propLayout(z);
-				if (num === op1) {
-					op3 = z + dataOffset;
-					op3Size = size;
+				propLayout(z);
+				if (pNum === op1) {
+					op3 = z + pDataOff;
+					op3Size = pSize;
 					return true;
 				}
-				z += dataOffset + size;
+				z += pDataOff + pSize;
 			}
 			op3 = 0;
 			op3Size = 0;
@@ -280,10 +291,12 @@ export class ZMachine {
 			}
 		};
 
-		const opfetch = (x: number, y: number): number | undefined => {
-			if ((x &= 3) === 3) return;
+		// Hot path: rebuild-avoiding dispatch array for operand-type codes 0/1/2.
+		const opDispatch: Array<() => number> = [pcget, pcgetb, pcfetch];
+		const opfetch = (x: number, y: number): number => {
+			if ((x &= 3) === 3) return 0; // operand omitted; opc unchanged
 			opc = y;
-			return [pcget, pcgetb, pcfetch][x]!();
+			return opDispatch[x]!();
 		};
 
 		// Shared CALL-and-store logic for call_vs / call_1s / call_2s / call_vs2.
@@ -298,16 +311,33 @@ export class ZMachine {
 			cs.unshift({ ds, pc, local: new Int16Array(localCount) });
 			ds = [];
 			pc = fn + 1;
-			for (let i = 0; i < localCount; i++) cs[0]!.local[i] = pcget();
-			const args = [op1, op2, op3, op4, op5, op6, op7];
-			const provided = Math.min(opc - 1, localCount, args.length);
-			for (let i = 0; i < provided; i++) cs[0]!.local[i] = args[i]!;
+			const locals = cs[0]!.local;
+			for (let i = 0; i < localCount; i++) locals[i] = pcget();
+			if (opc > 1 && localCount > 0) locals[0] = op1;
+			if (opc > 2 && localCount > 1) locals[1] = op2;
+			if (opc > 3 && localCount > 2) locals[2] = op3;
+			if (opc > 4 && localCount > 3) locals[3] = op4;
+			if (opc > 5 && localCount > 4) locals[4] = op5;
+			if (opc > 6 && localCount > 5) locals[5] = op6;
+			if (opc > 7 && localCount > 6) locals[6] = op7;
 		};
 
 		// Output-stream 3: redirected prints go to a memory table instead of the screen.
 		// A stack supports nesting (up to 16 levels per spec). Each entry stores the
 		// table's base address and write cursor.
 		const stream3: Array<{ base: number; cursor: number }> = [];
+
+		// Push current room/score/moves into the host-drawn status line (v3 only path;
+		// ignored if the game draws its own via split_window). Called before READ and
+		// READ_CHAR, and as the USL opcode.
+		const refreshStatus = async (): Promise<void> => {
+			if (!this.io.updateStatusLine) return;
+			await this.io.updateStatusLine(
+				decode(getPropAddr(xfetch(16)) + 1),
+				xfetch(18),
+				xfetch(17),
+			);
+		};
 
 		// Flush text; flip highlight when (flags & 2) changes. While output stream 3 is
 		// active, text is diverted into a memory buffer rather than reaching the screen.
@@ -359,15 +389,15 @@ export class ZMachine {
 				const x = pcgetb();
 				const isDouble = inst === 236 || inst === 250;
 				const y = isDouble ? pcgetb() : 0;
-				op0 = opfetch(x >> 6, 1) as number;
-				op1 = opfetch(x >> 4, 2) as number;
-				op2 = opfetch(x >> 2, 3) as number;
-				op3 = opfetch(x >> 0, 4) as number;
+				op0 = opfetch(x >> 6, 1);
+				op1 = opfetch(x >> 4, 2);
+				op2 = opfetch(x >> 2, 3);
+				op3 = opfetch(x >> 0, 4);
 				if (isDouble) {
-					op4 = opfetch(y >> 6, 5) as number;
-					op5 = opfetch(y >> 4, 6) as number;
-					op6 = opfetch(y >> 2, 7) as number;
-					op7 = opfetch(y >> 0, 8) as number;
+					op4 = opfetch(y >> 6, 5);
+					op5 = opfetch(y >> 4, 6);
+					op6 = opfetch(y >> 2, 7);
+					op7 = opfetch(y >> 0, 8);
 				}
 				if (inst < 224) inst &= 31;
 			}
@@ -442,12 +472,19 @@ export class ZMachine {
 						propfind();
 						const after = op3 + op3Size;
 						if (bytes[after] === 0) store(0);
-						else store(propLayout(after)[0]);
+						else {
+							propLayout(after);
+							store(pNum);
+						}
 					} else {
 						// First property of object op0.
 						x = getPropAddr(op0);
 						const first = x + bytes[x]! * 2 + 1;
-						store(bytes[first] === 0 ? 0 : propLayout(first)[0]);
+						if (bytes[first] === 0) store(0);
+						else {
+							propLayout(first);
+							store(pNum);
+						}
 					}
 					break;
 				case 20:
@@ -566,13 +603,7 @@ export class ZMachine {
 					await genPrint('\n');
 					break; // CRLF
 				case 188: // USL
-					if (this.io.updateStatusLine) {
-						await this.io.updateStatusLine(
-							decode(getPropAddr(xfetch(16)) + 1),
-							xfetch(18),
-							xfetch(17)
-						);
-					}
+					await refreshStatus();
 					break;
 				case 189:
 					predicate(this.verify());
@@ -583,7 +614,6 @@ export class ZMachine {
 					doCall();
 					break;
 				case 136: // call_1s (1OP:136) — call routine with no args, store result
-					opc = 1;
 					doCall();
 					break;
 				case 236: // call_vs2 (VAR:236) — call with up to 7 args, store result
@@ -602,13 +632,7 @@ export class ZMachine {
 					break;
 				case 228: // READ
 					await genPrint('');
-					if (this.io.updateStatusLine) {
-						await this.io.updateStatusLine(
-							decode(getPropAddr(xfetch(16)) + 1),
-							xfetch(18),
-							xfetch(17)
-						);
-					}
+					await refreshStatus();
 					this.vocabulary!.handleInput(
 						mem,
 						await this.io.read(bytes[op0 & 65535]!),
@@ -686,20 +710,13 @@ export class ZMachine {
 				case 244: // input_stream — no-op, we only read from the keyboard
 					break;
 
-				case 246: // read_char — read a single keypress, return its ZSCII code
+				case 246: { // read_char — read a single keypress, return its ZSCII code
 					await genPrint('');
-					if (this.io.updateStatusLine) {
-						await this.io.updateStatusLine(
-							decode(getPropAddr(xfetch(16)) + 1),
-							xfetch(18),
-							xfetch(17),
-						);
-					}
-					{
-						const s = await this.io.read(1);
-						store(s.length > 0 ? s.charCodeAt(0) : 13);
-					}
+					await refreshStatus();
+					const s = await this.io.read(1);
+					store(s.length > 0 ? s.charCodeAt(0) : 13);
 					break;
+				}
 
 				case 247: { // scan_table
 					// op0 = value, op1 = table, op2 = length, op3 = form (v5+; default 0x82)

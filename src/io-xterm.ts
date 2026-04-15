@@ -30,7 +30,6 @@ export class XtermIO implements ZMachineIO {
 		this.statusEl = statusEl;
 		this.upperEl = upperEl;
 		this.dataDisposable = term.onData((d) => this.handleInput(d));
-		this.renderUpper();
 	}
 
 	dispose(): void {
@@ -181,8 +180,13 @@ export class XtermIO implements ZMachineIO {
 	// ─── v4+ windowing and styling ─────────────────────────────────────────
 
 	splitWindow(lines: number): void {
+		// Grow with blanks, shrink by truncating (hidden rows are discarded).
+		if (lines > this.upperRows.length) {
+			while (this.upperRows.length < lines) this.upperRows.push('');
+		} else if (lines < this.upperRows.length) {
+			this.upperRows.length = lines;
+		}
 		this.upperLines = lines;
-		while (this.upperRows.length < lines) this.upperRows.push('');
 		this.renderUpper();
 	}
 
@@ -198,20 +202,25 @@ export class XtermIO implements ZMachineIO {
 			this.upperLines = 0;
 			this.upperRows = [];
 			this.renderUpper();
-			this.term.reset();
-			this.col = 0;
+			this.clearLower();
 		} else if (window === -2) {
-			this.upperRows = Array.from({ length: this.upperLines }, () => '');
-			this.renderUpper();
-			this.term.reset();
-			this.col = 0;
+			this.clearUpper();
+			this.clearLower();
 		} else if (window === WINDOW_LOWER) {
-			this.term.reset();
-			this.col = 0;
+			this.clearLower();
 		} else if (window === WINDOW_UPPER) {
-			this.upperRows = Array.from({ length: this.upperLines }, () => '');
-			this.renderUpper();
+			this.clearUpper();
 		}
+	}
+
+	private clearUpper(): void {
+		this.upperRows = Array.from({ length: this.upperLines }, () => '');
+		this.renderUpper();
+	}
+
+	private clearLower(): void {
+		this.term.reset();
+		this.col = 0;
 	}
 
 	eraseLine(value: number): void {
@@ -252,8 +261,13 @@ export class XtermIO implements ZMachineIO {
 
 	save(buf: Uint8Array): boolean {
 		try {
-			const b64 = btoa(String.fromCharCode(...buf));
-			localStorage.setItem('dork.save', b64);
+			// Avoid String.fromCharCode(...buf) — spread has an argument-count limit
+			// (~100k in most engines) and save buffers can exceed that.
+			let s = '';
+			for (let i = 0; i < buf.length; i += 0x8000) {
+				s += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000) as unknown as number[]);
+			}
+			localStorage.setItem('dork.save', btoa(s));
 			return true;
 		} catch {
 			return false;
