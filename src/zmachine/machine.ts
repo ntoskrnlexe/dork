@@ -7,6 +7,17 @@ import type { ZMachineIO } from './io.ts';
 export interface ZMachineOptions {
 	isTandy?: boolean;
 	seed?: number;
+	/**
+	 * Throw on unknown opcodes (default true). Turn off to run adversarial programs
+	 * like crashme that deliberately feed garbage bytes — the interpreter silently
+	 * no-ops unrecognized instructions instead.
+	 */
+	strict?: boolean;
+	/**
+	 * Safety cap on instructions executed before aborting with an error. Useful with
+	 * `strict: false` to bound runaway random code. Default: no limit.
+	 */
+	maxInstructions?: number;
 }
 
 /**
@@ -23,6 +34,8 @@ export class ZMachine {
 	readonly serial: string;
 	readonly zorkid: number;
 	readonly isTandy: boolean;
+	readonly strict: boolean;
+	readonly maxInstructions: number;
 	readonly io: ZMachineIO;
 
 	private initialSeed?: number;
@@ -48,6 +61,8 @@ export class ZMachine {
 			(bytes[2]! << (this.byteSwapped ? 0 : 8)) | (bytes[3]! << (this.byteSwapped ? 8 : 0));
 		this.isTandy = !!opts.isTandy;
 		this.initialSeed = opts.seed;
+		this.strict = opts.strict !== false;
+		this.maxInstructions = opts.maxInstructions ?? Infinity;
 		this.io = io;
 	}
 
@@ -424,7 +439,12 @@ export class ZMachine {
 		if (this.io.highlight) await this.io.highlight(!!(this.savedFlags & 2));
 
 		// ─── main fetch/decode/execute loop ─────────────────────────────────
+		let insnCount = 0;
+		const insnCap = this.maxInstructions;
 		for (;;) {
+			if (++insnCount > insnCap) {
+				throw new Error(`ZMachine: instruction cap exceeded (${insnCap})`);
+			}
 			let inst = pcgetb();
 			if (inst < 128) {
 				// 2OP
@@ -948,9 +968,16 @@ export class ZMachine {
 					break;
 
 				default:
-					throw new Error(
-						`ZMachine: invalid opcode ${inst >= 256 ? 'EXT:' + (inst - 256) : inst} at pc=${pc - 1}`,
-					);
+					if (this.strict) {
+						throw new Error(
+							`ZMachine: invalid opcode ${inst >= 256 ? 'EXT:' + (inst - 256) : inst} at pc=${pc - 1}`,
+						);
+					}
+					// Robust mode: operand bytes are already consumed; treat the instruction
+					// as a no-op and let the next byte be the next opcode. We can't know
+					// whether the unknown opcode would have stored or branched without a
+					// spec table, so we don't try to consume extra bytes.
+					break;
 			}
 		}
 	}
