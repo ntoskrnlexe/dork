@@ -62,7 +62,8 @@ export class Vocabulary {
 		let m: RegExpExecArray | null;
 		while ((m = rx.exec(str)) !== null) {
 			const word = m[0];
-			tokens.push([word.length, this.map.get(truncate(word)) ?? 0, m.index + 1]);
+			// Token offset is into the text buffer, which starts at `textOffset` past t1.
+			tokens.push([word.length, this.map.get(truncate(word)) ?? 0, m.index + textOffset]);
 		}
 
 		let i = (mem.bytes[t2 + 1] = tokens.length);

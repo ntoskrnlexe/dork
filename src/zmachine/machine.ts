@@ -342,6 +342,22 @@ export class ZMachine {
 			if (opc > 7 && localCount > 6) locals[6] = op7;
 		};
 
+		// Save / restore. Bodies are shared between v3/v4 SAVE/RESTORE (predicate-form,
+		// opcodes 181/182) and v5 EXT:0/EXT:1 (store-form). The restore helper returns
+		// the new (ds, cs, pc) tuple — the caller installs them since `let`-bound vars
+		// can't be reassigned through a closure return.
+		const doSave = async (): Promise<boolean> => {
+			this.savedFlags = mem.get(16);
+			return !!(this.io.save && (await this.io.save(serialize(mem, ds, cs, pc))));
+		};
+		const doRestore = async (): Promise<[number[], CallFrame[], number] | null> => {
+			this.savedFlags = mem.get(16);
+			const data = this.io.restore ? await this.io.restore() : null;
+			const restored = data ? deserialize(mem, data) : null;
+			mem.put(16, this.savedFlags);
+			return restored;
+		};
+
 		// Output-stream 3: redirected prints go to a memory table instead of the screen.
 		// A stack supports nesting (up to 16 levels per spec). Each entry stores the
 		// table's base address and write cursor.
@@ -432,7 +448,6 @@ export class ZMachine {
 			}
 
 			let x: number;
-			let z: Uint8Array | null | undefined;
 			switch (inst) {
 				case 1: // EQUAL?
 					predicate(op0 === op1 || (opc > 2 && op0 === op2) || (opc === 4 && op0 === op3));
@@ -616,21 +631,16 @@ export class ZMachine {
 				case 180:
 					break; // NOOP
 				case 181: // SAVE
-					this.savedFlags = mem.get(16);
-					predicate(this.io.save ? await this.io.save(serialize(mem, ds, cs, pc)) : false);
+					predicate(await doSave());
 					break;
-				case 182: {
-					// RESTORE
-					this.savedFlags = mem.get(16);
-					z = this.io.restore ? await this.io.restore() : null;
-					const restored = z ? deserialize(mem, z) : null;
-					mem.put(16, this.savedFlags);
-					if (restored) {
-						ds = restored[0];
-						cs = restored[1];
-						pc = restored[2];
+				case 182: { // RESTORE
+					const r = await doRestore();
+					if (r) {
+						ds = r[0];
+						cs = r[1];
+						pc = r[2];
 					}
-					predicate(!!restored);
+					predicate(!!r);
 					break;
 				}
 				case 183: // RESTART
@@ -775,13 +785,14 @@ export class ZMachine {
 					const entrySize = form & 0x7f;
 					const needle = op0 & 0xffff;
 					let found = 0;
+					let a = op1 & 0xffff;
 					for (let i = 0; i < op2; i++) {
-						const a = (op1 + i * entrySize) & 0xffff;
 						const v = isWord ? mem.getu(a) : bytes[a]!;
 						if (v === needle) {
 							found = a;
 							break;
 						}
+						a = (a + entrySize) & 0xffff;
 					}
 					store(found);
 					predicate(found);
@@ -798,74 +809,70 @@ export class ZMachine {
 				case 250: // call_vn2 — call with up to 7 args, no store
 					doCall(false);
 					break;
-				case 251: // tokenise text parse [dict [flag]]
+				case 251: { // tokenise text parse [dict [flag]]
+					const t1 = op0 & 0xffff;
+					const len = bytes[(t1 + 1) & 0xffff]!;
+					const slice = bytes.subarray(t1 + 2, t1 + 2 + len);
 					this.vocabulary!.handleInput(
 						mem,
-						String.fromCharCode(...bytes.slice(op0 + 2, op0 + 2 + bytes[op0 + 1]!)),
-						op0 & 0xffff,
+						String.fromCharCode.apply(null, slice as unknown as number[]),
+						t1,
 						op1 & 0xffff,
 						this.version,
 					);
 					break;
+				}
 				case 252: // encode_text — not yet implemented; write zeros so callers don't get garbage
 					mem.put((op3 + 0) & 0xffff, 0);
 					mem.put((op3 + 2) & 0xffff, 0);
 					mem.put((op3 + 4) & 0xffff, 0);
 					break;
 				case 253: { // copy_table src, dst, size
+					// Negative size = "always forward, no overlap check" per spec; copyWithin
+					// happens to be a forward copy when source/dest don't overlap or when dst<src,
+					// and a backward copy otherwise — exactly Z-machine memmove semantics.
 					const src = op0 & 0xffff;
 					const dst = op1 & 0xffff;
 					const size = (op2 << 16) >> 16;
-					if (dst === 0) {
-						// Zero out src for |size| bytes.
-						const n = Math.abs(size);
-						for (let i = 0; i < n; i++) bytes[(src + i) & 0xffff] = 0;
-					} else if (size < 0 || dst < src || dst >= src + size) {
-						// Forward copy is safe.
-						for (let i = 0; i < Math.abs(size); i++)
-							bytes[(dst + i) & 0xffff] = bytes[(src + i) & 0xffff]!;
-					} else {
-						// Overlap: copy backwards.
-						for (let i = size - 1; i >= 0; i--)
-							bytes[(dst + i) & 0xffff] = bytes[(src + i) & 0xffff]!;
-					}
+					const n = Math.abs(size);
+					if (dst === 0) bytes.fill(0, src, src + n);
+					else if (size < 0) {
+						// Forced forward copy regardless of overlap.
+						for (let i = 0; i < n; i++) bytes[(dst + i) & 0xffff] = bytes[(src + i) & 0xffff]!;
+					} else bytes.copyWithin(dst, src, src + n);
 					break;
 				}
 				case 254: { // print_table text, width [height [skip]]
-					const table = op0 & 0xffff;
 					const width = op1;
 					const height = opc >= 3 ? op2 : 1;
 					const skip = opc >= 4 ? op3 : 0;
-					let p = table;
+					let p = op0 & 0xffff;
 					for (let row = 0; row < height; row++) {
-						let line = '';
-						for (let col = 0; col < width; col++) line += String.fromCharCode(bytes[p++]!);
-						await genPrint(line);
-						if (row < height - 1) await genPrint('\n');
-						p += skip;
+						// Translate ZSCII byte 13 to '\n'; render the rest as raw ASCII.
+						const slice = bytes.subarray(p, p + width);
+						let line = String.fromCharCode.apply(null, slice as unknown as number[]);
+						if (line.includes('\r')) line = line.replace(/\r/g, '\n');
+						await genPrint(row < height - 1 ? line + '\n' : line);
+						p += width + skip;
 					}
 					break;
 				}
 				case 255: // check_arg_count N — branch if at least N args were given
-					predicate(cs[0] !== undefined && op0 <= cs[0].argCount);
+					predicate(op0 <= cs[0]!.argCount);
 					break;
 
 				// Extended (0xBE) opcodes — switch dispatch is offset by +256.
-				case 256: // ext:save (v5: stores 0/1/2 instead of branching)
-					this.savedFlags = mem.get(16);
-					store(this.io.save ? ((await this.io.save(serialize(mem, ds, cs, pc))) ? 1 : 0) : 0);
+				case 256: // ext:save (v5+: stores 1/0 instead of branching)
+					store((await doSave()) ? 1 : 0);
 					break;
-				case 257: { // ext:restore
-					this.savedFlags = mem.get(16);
-					z = this.io.restore ? await this.io.restore() : null;
-					const restored = z ? deserialize(mem, z) : null;
-					mem.put(16, this.savedFlags);
-					if (restored) {
-						ds = restored[0];
-						cs = restored[1];
-						pc = restored[2];
+				case 257: { // ext:restore (v5+: stores 2 on success, 0 on failure)
+					const r = await doRestore();
+					if (r) {
+						ds = r[0];
+						cs = r[1];
+						pc = r[2];
 					}
-					store(restored ? 2 : 0);
+					store(r ? 2 : 0);
 					break;
 				}
 				case 258: { // ext:log_shift  value, places (negative = right shift)
