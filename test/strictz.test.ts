@@ -1,5 +1,6 @@
 import { test, expect } from 'bun:test';
-import { ZMachine, type ZMachineIO } from '../src/zmachine/index.ts';
+import { ZMachine } from '../src/zmachine/index.ts';
+import { makeStubIO } from './helpers/stub-io.ts';
 
 /**
  * strictz checks that interpreter operations on object 0 don't crash and don't
@@ -8,35 +9,20 @@ import { ZMachine, type ZMachineIO } from '../src/zmachine/index.ts';
  */
 test('strictz conformance: object-0 operations are safe', async () => {
 	const story = new Uint8Array(await Bun.file('test/fixtures/strictz.z5').arrayBuffer());
-	let output = '';
 	const cmds = ['n', '', '', '', 'quit', 'y'];
 	let i = 0;
-	const io: ZMachineIO = {
-		print(t) {
-			output += t;
-		},
-		read(): string {
+	const { io, output } = makeStubIO({
+		read: () => {
 			if (i >= cmds.length) throw new Error('SCRIPT_EXHAUSTED');
 			return cmds[i++]!;
 		},
-		splitWindow() {},
-		setWindow() {},
-		setCursor() {},
-		setTextStyle() {},
-		bufferMode() {},
-		setColour() {},
-		eraseWindow() {},
-		eraseLine() {},
-		getCursor(): readonly [number, number] {
-			return [1, 1] as const;
-		},
-	};
+	});
 	try {
 		await new ZMachine(story, io, { seed: 1 }).run();
 	} catch (e) {
 		if (!String(e).includes('SCRIPT_EXHAUSTED')) throw e;
 	}
 
-	expect(output).toContain('Test completed!');
-	expect(output).not.toContain('incorrect');
+	expect(output.value).toContain('Test completed!');
+	expect(output.value).not.toContain('incorrect');
 }, 30_000);

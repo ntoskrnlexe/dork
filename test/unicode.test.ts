@@ -1,5 +1,6 @@
 import { test, expect } from 'bun:test';
-import { ZMachine, type ZMachineIO } from '../src/zmachine/index.ts';
+import { ZMachine } from '../src/zmachine/index.ts';
+import { makeStubIO } from './helpers/stub-io.ts';
 
 /**
  * David Kinder's Unicode test. Exercises:
@@ -9,26 +10,11 @@ import { ZMachine, type ZMachineIO } from '../src/zmachine/index.ts';
  */
 test('unicode.z5: renders Euro / © / ™ from the game-supplied Unicode table', async () => {
 	const story = new Uint8Array(await Bun.file('test/fixtures/unicode.z5').arrayBuffer());
-	let output = '';
-	const io: ZMachineIO = {
-		print(t) {
-			output += t;
-		},
-		read(): string {
+	const { io, output } = makeStubIO({
+		read: () => {
 			throw new Error('SCRIPT_EXHAUSTED');
 		},
-		splitWindow() {},
-		setWindow() {},
-		setCursor() {},
-		setTextStyle() {},
-		bufferMode() {},
-		setColour() {},
-		eraseWindow() {},
-		eraseLine() {},
-		getCursor(): readonly [number, number] {
-			return [1, 1] as const;
-		},
-	};
+	});
 	try {
 		await new ZMachine(story, io, { seed: 1 }).run();
 	} catch (e) {
@@ -36,10 +22,9 @@ test('unicode.z5: renders Euro / © / ™ from the game-supplied Unicode table',
 	}
 
 	// Introduction uses the game's custom table (codes 224-226 → © ™ €).
-	expect(output).toContain('€');
-	expect(output).toContain('©');
-	expect(output).toContain('™');
-	// print_unicode renders into Greek, Cyrillic, Arabic blocks.
-	expect(output).toContain('Greek and Coptic');
-	expect(output).toContain('Arabic');
+	expect(output.value).toContain('€');
+	expect(output.value).toContain('©');
+	expect(output.value).toContain('™');
+	expect(output.value).toContain('Greek and Coptic');
+	expect(output.value).toContain('Arabic');
 }, 30_000);

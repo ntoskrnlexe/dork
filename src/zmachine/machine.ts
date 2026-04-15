@@ -241,10 +241,17 @@ export class ZMachine {
 			pc += x - 2;
 		};
 
-		// Object-field accessors (1-byte in v3, 2-byte in v4).
-		const objField = (obj: number, off: number): number =>
-			v3 ? bytes[objects + obj * objSize + off]! : mem.getu(objects + obj * objSize + off);
+		// Object-field accessors. 1-byte in v3, 2-byte in v4+. Object 0 is "nothing";
+		// per the Z-machine spec operations on it don't read/write the default-property
+		// table that sits just before the object table, so the accessors short-circuit.
+		const objField = (obj: number, off: number): number => {
+			if (obj === 0) return 0;
+			return v3
+				? bytes[objects + obj * objSize + off]!
+				: mem.getu(objects + obj * objSize + off);
+		};
 		const setObjField = (obj: number, off: number, val: number): void => {
+			if (obj === 0) return;
 			if (v3) bytes[objects + obj * objSize + off] = val;
 			else mem.putu(objects + obj * objSize + off, val);
 		};
@@ -254,13 +261,21 @@ export class ZMachine {
 		const setParent = (obj: number, val: number): void => setObjField(obj, parentOff, val);
 		const setSibling = (obj: number, val: number): void => setObjField(obj, siblingOff, val);
 		const setChild = (obj: number, val: number): void => setObjField(obj, childOff, val);
-		const getPropAddr = (obj: number): number => mem.getu(objects + obj * objSize + propAddrOff);
+		const getPropAddr = (obj: number): number =>
+			obj === 0 ? 0 : mem.getu(objects + obj * objSize + propAddrOff);
 
-		const flagset = (): void => {
+		/**
+		 * Prep FSET/FCLEAR/FSET? operands:
+		 *   op2 = word address inside the object's attribute bits (opc holds its value);
+		 *   op3 = the bit mask for the target attribute.
+		 * Returns false for object 0 — caller should treat as no-op / false.
+		 */
+		const flagset = (): boolean => {
+			if (op0 === 0) return false;
 			op3 = 1 << (15 & ~op1);
-			// Attribute bits live in 16-bit words: word index = op1 >> 4.
 			op2 = objects + op0 * objSize + (op1 >> 4) * 2;
 			opc = mem.get(op2);
+			return true;
 		};
 
 		/**
@@ -300,6 +315,11 @@ export class ZMachine {
 		};
 
 		const propfind = (): boolean => {
+			if (op0 === 0) {
+				op3 = 0;
+				op3Size = 0;
+				return false;
+			}
 			let z = getPropAddr(op0);
 			z += bytes[z]! * 2 + 1; // skip short name (length prefix in words)
 			while (bytes[z]) {
@@ -317,6 +337,7 @@ export class ZMachine {
 		};
 
 		const move = (x: number, y: number): void => {
+			if (x === 0) return; // spec: no-op on object 0 (caught by strictz).
 			let w = 0;
 			let z: number;
 			if ((z = getParent(x))) {
@@ -439,10 +460,14 @@ export class ZMachine {
 		if (this.io.highlight) await this.io.highlight(!!(this.savedFlags & 2));
 
 		// ─── main fetch/decode/execute loop ─────────────────────────────────
+		// Only arm the counter when a finite cap is set — otherwise the per-iteration
+		// increment + compare runs for free games and crosses the Smi→HeapNumber
+		// boundary on long playthroughs.
 		let insnCount = 0;
 		const insnCap = this.maxInstructions;
+		const capped = insnCap !== Infinity;
 		for (;;) {
-			if (++insnCount > insnCap) {
+			if (capped && ++insnCount > insnCap) {
 				throw new Error(`ZMachine: instruction cap exceeded (${insnCap})`);
 			}
 			let inst = pcgetb();
@@ -511,8 +536,8 @@ export class ZMachine {
 					xstore(op0, x);
 					predicate(x > op1);
 					break;
-				case 6: // IN? — parent(0) is 0, so `jin 0 0` is true.
-					predicate((op0 === 0 ? 0 : getParent(op0)) === op1);
+				case 6: // IN? — parent(0) is 0 per accessor, so `jin 0 0` is true.
+					predicate(getParent(op0) === op1);
 					break;
 				case 7:
 					predicate((op0 & op1) === op1);
@@ -523,30 +548,20 @@ export class ZMachine {
 				case 9:
 					store(op0 & op1);
 					break; // BAND
-				case 10: // FSET? — object 0 has no attributes.
-					if (op0 === 0) predicate(false);
-					else {
-						flagset();
-						predicate(!!(opc & op3));
-					}
+				case 10: // FSET? (test_attr)
+					predicate(flagset() && !!(opc & op3));
 					break;
-				case 11: // FSET — no-op on object 0 (else would corrupt default-property table).
-					if (op0 !== 0) {
-						flagset();
-						mem.put(op2, opc | op3);
-					}
+				case 11: // FSET (set_attr)
+					if (flagset()) mem.put(op2, opc | op3);
 					break;
-				case 12: // FCLEAR — no-op on object 0.
-					if (op0 !== 0) {
-						flagset();
-						mem.put(op2, opc & ~op3);
-					}
+				case 12: // FCLEAR (clear_attr)
+					if (flagset()) mem.put(op2, opc & ~op3);
 					break;
 				case 13:
 					xstore(op0, op1);
 					break; // SET
-				case 14: // MOVE (insert_obj) — no-op when source is 0; dest 0 is valid (remove).
-					if (op0 !== 0) move(op0, op1);
+				case 14: // MOVE (insert_obj) — dest 0 means "remove from tree".
+					move(op0, op1);
 					break;
 				case 15:
 					store(mem.get((op0 + op1 * 2) & 65535));
@@ -554,21 +569,16 @@ export class ZMachine {
 				case 16:
 					store(bytes[(op0 + op1) & 65535]!);
 					break; // GETB
-				case 17: // GETP — obj 0 returns the prop's default value (never matches, so default applies).
-					if (op0 === 0) store(mem.get(defprop + 2 * op1));
-					else if (propfind()) store(op3Size === 2 ? mem.get(op3) : bytes[op3]!);
+				case 17: // GETP — propfind fails on obj 0, so default value is stored.
+					if (propfind()) store(op3Size === 2 ? mem.get(op3) : bytes[op3]!);
 					else store(mem.get(defprop + 2 * op1));
 					break;
-				case 18: // GETPT — obj 0 has no properties.
-					if (op0 === 0) store(0);
-					else {
-						propfind();
-						store(op3);
-					}
+				case 18: // GETPT
+					propfind();
+					store(op3);
 					break;
 				case 19: // NEXTP
 					if (op0 === 0) {
-						// Object 0 has no properties.
 						store(0);
 						break;
 					}
@@ -625,17 +635,15 @@ export class ZMachine {
 					predicate(!op0);
 					break; // ZERO?
 				case 129: // NEXT? (get_sibling)
-					x = op0 === 0 ? 0 : getSibling(op0);
-					store(x);
+					store((x = getSibling(op0)));
 					predicate(x);
 					break;
 				case 130: // FIRST? (get_child)
-					x = op0 === 0 ? 0 : getChild(op0);
-					store(x);
+					store((x = getChild(op0)));
 					predicate(x);
 					break;
 				case 131: // LOC (get_parent)
-					store(op0 === 0 ? 0 : getParent(op0));
+					store(getParent(op0));
 					break;
 				case 132: // PTSIZE (get_prop_len)
 					// Z-Machine 1.1: get_prop_len 0 must return 0 (caught by Praxix specfixes).
@@ -652,10 +660,10 @@ export class ZMachine {
 				case 135:
 					await genPrint(decode(op0 & 65535));
 					break; // PRINTB
-				case 137: // REMOVE (remove_obj) — no-op on object 0.
-					if (op0 !== 0) move(op0, 0);
+				case 137: // REMOVE (remove_obj)
+					move(op0, 0);
 					break;
-				case 138: // PRINTD (print_obj) — no-op on object 0.
+				case 138: // PRINTD (print_obj) — guard against obj 0 (getPropAddr returns 0).
 					if (op0 !== 0) await genPrint(decode(getPropAddr(op0) + 1));
 					break;
 				case 139:
@@ -792,7 +800,7 @@ export class ZMachine {
 					break;
 
 				case 237: // erase_window
-					if (this.io.eraseWindow) await this.io.eraseWindow((op0 << 16) >> 16);
+					if (this.io.eraseWindow) await this.io.eraseWindow(s16(op0));
 					break;
 				case 238: // erase_line
 					if (this.io.eraseLine) await this.io.eraseLine(op0);
@@ -897,7 +905,7 @@ export class ZMachine {
 					// and a backward copy otherwise — exactly Z-machine memmove semantics.
 					const src = op0 & 0xffff;
 					const dst = op1 & 0xffff;
-					const size = (op2 << 16) >> 16;
+					const size = s16(op2);
 					const n = Math.abs(size);
 					if (dst === 0) bytes.fill(0, src, src + n);
 					else if (size < 0) {
@@ -940,15 +948,15 @@ export class ZMachine {
 					break;
 				}
 				case 258: { // ext:log_shift  value, places (negative = right shift)
-					const places = (op1 << 16) >> 16;
+					const places = s16(op1);
 					const u = op0 & 0xffff;
 					store(places >= 0 ? (u << places) & 0xffff : u >>> -places);
 					break;
 				}
 				case 259: { // ext:art_shift — arithmetic shift (sign-preserving for right)
-					const places = (op1 << 16) >> 16;
-					const s = (op0 << 16) >> 16;
-					store(places >= 0 ? (s << places) & 0xffff : s >> -places);
+					const places = s16(op1);
+					const signed = s16(op0);
+					store(places >= 0 ? (signed << places) & 0xffff : signed >> -places);
 					break;
 				}
 				case 260: // ext:set_font — return previous font (1 = normal). We don't switch fonts.

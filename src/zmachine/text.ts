@@ -11,24 +11,33 @@ const ALPHABET =
 export const DEFAULT_ZSCII_EXTRA =
 	'äöüÄÖÜß»«ëïÿËÏáéíóúýÁÉÍÓÚÝàèìòùÀÈÌÒÙâêîôûÂÊÎÔÛåÅøØãñõÃÑÕæÆçÇþðÞÐ£œŒ¡¿';
 
+// ZSCII 155..251 is the range where games may supply custom Unicode translations
+// (§3.8.4). The default table covers 155..223 only; custom tables may extend.
+const ZSCII_EXTRA_MIN = 155;
+const ZSCII_EXTRA_MAX = 251;
+const MAX_CUSTOM_ENTRIES = ZSCII_EXTRA_MAX - ZSCII_EXTRA_MIN + 1; // 97
+
+// Header extension table pointer (Z-spec §11.1.36). Word 3 within the extension
+// points to the custom Unicode table.
+const HEADER_EXT_PTR = 0x36;
+const UNICODE_TABLE_WORD = 3;
+
 /**
  * Read a game-supplied Unicode translation table (v5+ header extension).
- * Returns the 69-char table if present, or null to use defaults.
+ * Returns the full 97-char table (padded from defaults) if present, or null.
  */
 export function readUnicodeTable(mem: Memory): string | null {
-	const extAddr = mem.getu(0x36);
+	const extAddr = mem.getu(HEADER_EXT_PTR);
 	if (extAddr === 0) return null;
 	const extLen = mem.getu(extAddr);
-	if (extLen < 3) return null;
-	const tableAddr = mem.getu(extAddr + 6);
+	if (extLen < UNICODE_TABLE_WORD) return null;
+	const tableAddr = mem.getu(extAddr + 2 * UNICODE_TABLE_WORD);
 	if (tableAddr === 0) return null;
 	const count = mem.bytes[tableAddr]!;
 	let out = '';
-	// Custom tables may define up to 97 entries (ZSCII 155..251).
-	for (let i = 0; i < count && i < 97; i++) {
+	for (let i = 0; i < count && i < MAX_CUSTOM_ENTRIES; i++) {
 		out += String.fromCharCode(mem.getu(tableAddr + 1 + i * 2));
 	}
-	// Pad any unfilled codes with defaults.
 	if (out.length < DEFAULT_ZSCII_EXTRA.length) {
 		out += DEFAULT_ZSCII_EXTRA.slice(out.length);
 	}
@@ -39,8 +48,9 @@ export function readUnicodeTable(mem: Memory): string | null {
 export function zsciiToChar(code: number, zsciiExtra: string = DEFAULT_ZSCII_EXTRA): string {
 	if (code === 13) return '\n';
 	if (code === 0) return '';
-	// Per §3.8.4, codes 155..251 are the extended (accent / custom) range.
-	if (code >= 155 && code <= 251) return zsciiExtra[code - 155] ?? '';
+	if (code >= ZSCII_EXTRA_MIN && code <= ZSCII_EXTRA_MAX) {
+		return zsciiExtra[code - ZSCII_EXTRA_MIN] ?? '';
+	}
 	return String.fromCharCode(code);
 }
 
@@ -51,6 +61,9 @@ export function zsciiToChar(code: number, zsciiExtra: string = DEFAULT_ZSCII_EXT
  */
 export function charToZscii(code: number, zsciiExtra: string = DEFAULT_ZSCII_EXTRA): number {
 	if (code === 10) return 13;
+	// ASCII and low-ZSCII fast path: the custom range starts at U+00A0 (the
+	// lowest codepoint in ZSCII_EXTRA), so anything below that can't be remapped.
+	if (code < 0xa0) return code;
 	for (let i = 0; i < zsciiExtra.length; i++) {
 		if (zsciiExtra.charCodeAt(i) === code) return 155 + i;
 	}
@@ -86,7 +99,10 @@ export function decodeText(
 			ts = 4;
 		} else if (ts === 4) {
 			y += v;
-			o += zsciiToChar(y, zsciiExtra);
+			// Inline the ASCII fast path; only cold cases need the full translator.
+			if (y === 13) o += '\n';
+			else if (y > 0 && y < 155) o += String.fromCharCode(y);
+			else if (y) o += zsciiToChar(y, zsciiExtra);
 			ts = ps;
 		} else if (ts === 5) {
 			o += decodeText(mem, fwords, mem.getu(fwords + (y + v) * 2) * 2, zsciiExtra).text;

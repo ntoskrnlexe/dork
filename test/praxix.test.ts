@@ -1,5 +1,6 @@
 import { test, expect } from 'bun:test';
-import { ZMachine, type ZMachineIO } from '../src/zmachine/index.ts';
+import { ZMachine } from '../src/zmachine/index.ts';
+import { makeStubIO } from './helpers/stub-io.ts';
 
 /**
  * Praxix is a stricter Z-code interpreter unit test by Dannii Willis.
@@ -9,31 +10,14 @@ import { ZMachine, type ZMachineIO } from '../src/zmachine/index.ts';
  */
 test('Praxix conformance at v5', async () => {
 	const story = new Uint8Array(await Bun.file('test/fixtures/praxix.z5').arrayBuffer());
-	let output = '';
-	const io: ZMachineIO = {
-		print(t) {
-			output += t;
-		},
-		read(): string {
-			if (output.includes('All tests passed.') || output.includes('tests failed overall')) {
-				return 'quit';
-			}
-			return 'all';
-		},
-		splitWindow() {},
-		setWindow() {},
-		setCursor() {},
-		setTextStyle() {},
-		bufferMode() {},
-		setColour() {},
-		eraseWindow() {},
-		eraseLine() {},
-		getCursor(): readonly [number, number] {
-			return [1, 1] as const;
-		},
-	};
+	const { io, output } = makeStubIO({
+		read: () =>
+			output.value.includes('All tests passed.') || output.value.includes('tests failed overall')
+				? 'quit'
+				: 'all',
+	});
 	await new ZMachine(story, io, { seed: 1 }).run();
 
-	expect(output).toContain('All tests passed.');
-	expect(output).not.toContain('FAIL');
+	expect(output.value).toContain('All tests passed.');
+	expect(output.value).not.toContain('FAIL');
 }, 30_000);
