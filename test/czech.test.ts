@@ -32,10 +32,10 @@ function normalize(text: string): string {
 		.trim();
 }
 
-test('CZECH conformance at v3', async () => {
-	const actual = await runCzech('test/fixtures/czech.z3');
-	const expected = await Bun.file('test/fixtures/czech.out3').text();
-	await Bun.write('test/czech.actual3.txt', actual);
+async function conformanceCheck(version: 3 | 4): Promise<void> {
+	const actual = await runCzech(`test/fixtures/czech.z${version}`);
+	const expected = await Bun.file(`test/fixtures/czech.out${version}`).text();
+	await Bun.write(`test/czech.actual${version}.txt`, actual);
 
 	// CZECH prints its own Pass/Fail summary; success = "Failed: 0" in the output.
 	expect(actual).toContain('Failed: 0');
@@ -43,4 +43,7 @@ test('CZECH conformance at v3', async () => {
 
 	// And the rest of the transcript should match the reference (header block aside).
 	expect(normalize(actual)).toBe(normalize(expected));
-}, 30_000);
+}
+
+test('CZECH conformance at v3', () => conformanceCheck(3), 30_000);
+test('CZECH conformance at v4', () => conformanceCheck(4), 30_000);

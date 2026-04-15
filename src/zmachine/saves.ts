@@ -6,11 +6,17 @@ export interface CallFrame {
 	ds: number[];
 }
 
+/**
+ * Verify the story file checksum against the header-declared value.
+ * The stored file length is scaled by version: v1-3 → bytes/2, v4-5 → bytes/4, v6-8 → bytes/8.
+ */
 export function verify(memInit: Uint8Array, mem: Memory): boolean {
+	const version = memInit[0]!;
+	const lengthScale = version <= 3 ? 2 : version <= 5 ? 4 : 8;
 	const plenth = mem.getu(26);
 	let pchksm = mem.getu(28);
 	let i = 64;
-	while (i < plenth * 2) pchksm = (pchksm - memInit[i++]!) & 65535;
+	while (i < plenth * lengthScale) pchksm = (pchksm - memInit[i++]!) & 65535;
 	return !pchksm;
 }
 

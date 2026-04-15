@@ -13,8 +13,11 @@ export interface ZMachineOptions {
  * Z-machine v3 interpreter. Story file goes in; calls into `io` come out.
  * Port of public-domain JSZM (by zzo38) to async/await + TypeScript.
  */
+export type ZVersion = 3 | 4;
+
 export class ZMachine {
 	readonly memInit: Uint8Array;
+	readonly version: ZVersion;
 	readonly byteSwapped: boolean;
 	readonly statusType: boolean;
 	readonly serial: string;
@@ -32,7 +35,9 @@ export class ZMachine {
 	constructor(story: ArrayLike<number>, io: ZMachineIO, opts: ZMachineOptions = {}) {
 		const bytes = new Uint8Array(story);
 		this.memInit = bytes;
-		if (bytes[0] !== 3) throw new Error('Unsupported Z-code version.');
+		const v = bytes[0];
+		if (v !== 3 && v !== 4) throw new Error(`Unsupported Z-code version ${String(v)}.`);
+		this.version = v as ZVersion;
 		this.byteSwapped = !!(bytes[1]! & 1);
 		this.statusType = !!(bytes[1]! & 2);
 		this.serial = String.fromCharCode(...bytes.slice(18, 24));
@@ -65,12 +70,27 @@ export class ZMachine {
 		let op0 = 0,
 			op1 = 0,
 			op2 = 0,
-			op3 = 0;
+			op3 = 0,
+			op4 = 0,
+			op5 = 0,
+			op6 = 0,
+			op7 = 0;
 		let opc = 0;
+		let op3Size = 0; // byte size of the property last located by propfind
 		let globals = 0;
 		let objects = 0;
 		let defprop = 0;
 		let endText = 0;
+
+		// Object-table layout (v3: 9-byte entries, 32 attrs; v4: 14-byte entries, 48 attrs).
+		const v3 = this.version === 3;
+		const objSize = v3 ? 9 : 14;
+		const attrBytes = v3 ? 4 : 6;
+		const parentOff = v3 ? 4 : 6;
+		const siblingOff = v3 ? 5 : 8;
+		const childOff = v3 ? 6 : 10;
+		const propAddrOff = attrBytes + (v3 ? 3 : 6);
+		const defaultPropCount = v3 ? 31 : 63;
 
 		const initRng = (): void => {
 			this.seed =
@@ -82,10 +102,21 @@ export class ZMachine {
 		const init = (): void => {
 			mem = this.mem = new Memory(new Uint8Array(this.memInit), this.byteSwapped);
 			bytes = mem.bytes;
-			bytes[1]! &= 3;
-			if (this.isTandy) bytes[1]! |= 8;
-			if (!this.io.updateStatusLine) bytes[1]! |= 16;
-			if (this.io.screen && this.io.split) bytes[1]! |= 32;
+			if (v3) {
+				bytes[1]! &= 3;
+				if (this.isTandy) bytes[1]! |= 8;
+				if (!this.io.updateStatusLine) bytes[1]! |= 16;
+				if (this.io.screen && this.io.split) bytes[1]! |= 32;
+			} else {
+				// v4 flags1: bit 2=bold, bit 3=italic, bit 4=fixed-pitch, bit 7=timed input.
+				// We can render bold/italic/fixed via ANSI; timers not yet implemented.
+				bytes[1]! = 0b0001_1100;
+				// Header extras expected by v4 games.
+				bytes[30] = 0; // interpreter number
+				bytes[31] = 0; // interpreter version
+				bytes[32] = 25; // screen height in lines
+				bytes[33] = 80; // screen width in characters
+			}
 			mem.put(16, this.savedFlags);
 			this.fwords = mem.getu(24);
 			if (!this.vocabulary) this.vocabulary = new Vocabulary(mem, this.fwords, mem.getu(8));
@@ -94,7 +125,8 @@ export class ZMachine {
 			cs = [];
 			ds = [];
 			pc = mem.getu(6);
-			objects = defprop + 55;
+			// objects[1] = objTableStart + defaultPropCount*2; objects + 1*objSize = that.
+			objects = defprop + 2 + defaultPropCount * 2 - objSize;
 			initRng();
 		};
 
@@ -104,7 +136,9 @@ export class ZMachine {
 			return r.text;
 		};
 
-		const addr = (x: number): number => (x & 65535) << 1;
+		// v3 packs addresses by 2 (shift 1); v4/v5 pack by 4 (shift 2).
+		const packShift = this.version === 3 ? 1 : 2;
+		const addr = (x: number): number => (x & 65535) << packShift;
 
 		const pcgetb = (): number => bytes[pc++]!;
 		const pcget = (): number => {
@@ -158,48 +192,91 @@ export class ZMachine {
 			pc += x - 2;
 		};
 
+		// Object-field accessors (1-byte in v3, 2-byte in v4).
+		const objField = (obj: number, off: number): number =>
+			v3 ? bytes[objects + obj * objSize + off]! : mem.getu(objects + obj * objSize + off);
+		const setObjField = (obj: number, off: number, val: number): void => {
+			if (v3) bytes[objects + obj * objSize + off] = val;
+			else mem.putu(objects + obj * objSize + off, val);
+		};
+		const getParent = (obj: number): number => objField(obj, parentOff);
+		const getSibling = (obj: number): number => objField(obj, siblingOff);
+		const getChild = (obj: number): number => objField(obj, childOff);
+		const setParent = (obj: number, val: number): void => setObjField(obj, parentOff, val);
+		const setSibling = (obj: number, val: number): void => setObjField(obj, siblingOff, val);
+		const setChild = (obj: number, val: number): void => setObjField(obj, childOff, val);
+		const getPropAddr = (obj: number): number => mem.getu(objects + obj * objSize + propAddrOff);
+
 		const flagset = (): void => {
 			op3 = 1 << (15 & ~op1);
-			op2 = objects + op0 * 9 + (op1 & 16 ? 2 : 0);
+			// Attribute bits live in 16-bit words: word index = op1 >> 4.
+			op2 = objects + op0 * objSize + (op1 >> 4) * 2;
 			opc = mem.get(op2);
 		};
 
+		/**
+		 * Decode a property header at `header`. Returns the property number, the total
+		 * byte length of the data, and the offset (1 or 2) from `header` to the data.
+		 * v3: 1-byte header, `(size-1)<<5 | (num-1)`, num in 1..31, size in 1..8.
+		 * v4: 1 or 2-byte header. If high bit set, 2-byte form: [0x80|num][0xC0|size]
+		 *     (with size==0 meaning 64). Else 1-byte form: bit 6 ⇒ size=2, else size=1.
+		 */
+		const propLayout = (header: number): [num: number, size: number, dataOffset: number] => {
+			const b1 = bytes[header]!;
+			if (v3) return [b1 & 31, (b1 >> 5) + 1, 1];
+			if (b1 & 0x80) {
+				const sz = bytes[header + 1]! & 0x3f;
+				return [b1 & 0x3f, sz || 64, 2];
+			}
+			return [b1 & 0x3f, b1 & 0x40 ? 2 : 1, 1];
+		};
+
+		/** Size of the property whose data starts at `dataAddr` (v3/v4 formats differ). */
+		const propSizeAt = (dataAddr: number): number => {
+			const sb = bytes[(dataAddr - 1) & 65535]!;
+			if (v3) return (sb >> 5) + 1;
+			if (sb & 0x80) return (sb & 0x3f) || 64;
+			return sb & 0x40 ? 2 : 1;
+		};
+
 		const propfind = (): boolean => {
-			let z = mem.getu(objects + op0 * 9 + 7);
-			z += bytes[z]! * 2 + 1;
+			let z = getPropAddr(op0);
+			z += bytes[z]! * 2 + 1; // skip short name (length prefix in words)
 			while (bytes[z]) {
-				if ((bytes[z]! & 31) === op1) {
-					op3 = z + 1;
+				const [num, size, dataOffset] = propLayout(z);
+				if (num === op1) {
+					op3 = z + dataOffset;
+					op3Size = size;
 					return true;
-				} else {
-					z += (bytes[z]! >> 5) + 2;
 				}
+				z += dataOffset + size;
 			}
 			op3 = 0;
+			op3Size = 0;
 			return false;
 		};
 
 		const move = (x: number, y: number): void => {
 			let w = 0;
 			let z: number;
-			if ((z = bytes[objects + x * 9 + 4]!)) {
-				if (bytes[objects + z * 9 + 6]! === x) {
-					bytes[objects + z * 9 + 6] = bytes[objects + x * 9 + 5]!;
+			if ((z = getParent(x))) {
+				if (getChild(z) === x) {
+					setChild(z, getSibling(x));
 				} else {
-					z = bytes[objects + z * 9 + 6]!;
+					z = getChild(z);
 					while (z !== x) {
 						w = z;
-						z = bytes[objects + z * 9 + 5]!;
+						z = getSibling(z);
 					}
-					bytes[objects + w * 9 + 5] = bytes[objects + x * 9 + 5]!;
+					setSibling(w, getSibling(x));
 				}
 			}
-			bytes[objects + x * 9 + 4] = y;
+			setParent(x, y);
 			if (y) {
-				bytes[objects + x * 9 + 5] = bytes[objects + y * 9 + 6]!;
-				bytes[objects + y * 9 + 6] = x;
+				setSibling(x, getChild(y));
+				setChild(y, x);
 			} else {
-				bytes[objects + x * 9 + 5] = 0;
+				setSibling(x, 0);
 			}
 		};
 
@@ -209,8 +286,41 @@ export class ZMachine {
 			return [pcget, pcgetb, pcfetch][x]!();
 		};
 
-		// Flush text; flip highlight when (flags & 2) changes.
+		// Shared CALL-and-store logic for call_vs / call_1s / call_2s / call_vs2.
+		// `opc` must already reflect the total operand count (routine + args).
+		const doCall = (): void => {
+			if (!op0) {
+				store(0);
+				return;
+			}
+			const fn = addr(op0);
+			const localCount = bytes[fn]!;
+			cs.unshift({ ds, pc, local: new Int16Array(localCount) });
+			ds = [];
+			pc = fn + 1;
+			for (let i = 0; i < localCount; i++) cs[0]!.local[i] = pcget();
+			const args = [op1, op2, op3, op4, op5, op6, op7];
+			const provided = Math.min(opc - 1, localCount, args.length);
+			for (let i = 0; i < provided; i++) cs[0]!.local[i] = args[i]!;
+		};
+
+		// Output-stream 3: redirected prints go to a memory table instead of the screen.
+		// A stack supports nesting (up to 16 levels per spec). Each entry stores the
+		// table's base address and write cursor.
+		const stream3: Array<{ base: number; cursor: number }> = [];
+
+		// Flush text; flip highlight when (flags & 2) changes. While output stream 3 is
+		// active, text is diverted into a memory buffer rather than reaching the screen.
 		const genPrint = async (text: string): Promise<void> => {
+			if (stream3.length > 0) {
+				const top = stream3[stream3.length - 1]!;
+				// v3/v4 store each printed character as a ZSCII byte (newline → 13).
+				for (let i = 0; i < text.length; i++) {
+					const c = text.charCodeAt(i);
+					bytes[top.cursor++] = c === 10 ? 13 : c;
+				}
+				return;
+			}
 			const x = mem.get(16);
 			if (x !== this.savedFlags) {
 				this.savedFlags = x;
@@ -242,13 +352,23 @@ export class ZMachine {
 				if (x === 0) op0 = pcget();
 				else if (x === 1) op0 = pcgetb();
 				else if (x === 2) op0 = pcfetch();
+				opc = 1;
 			} else if (inst >= 192) {
-				// EXT
+				// EXT (VAR / 2OP long form). call_vs2 (236) and call_vn2 (250) have
+				// TWO operand-types bytes up front, both read before any operand bytes.
 				const x = pcgetb();
+				const isDouble = inst === 236 || inst === 250;
+				const y = isDouble ? pcgetb() : 0;
 				op0 = opfetch(x >> 6, 1) as number;
 				op1 = opfetch(x >> 4, 2) as number;
 				op2 = opfetch(x >> 2, 3) as number;
 				op3 = opfetch(x >> 0, 4) as number;
+				if (isDouble) {
+					op4 = opfetch(y >> 6, 5) as number;
+					op5 = opfetch(y >> 4, 6) as number;
+					op6 = opfetch(y >> 2, 7) as number;
+					op7 = opfetch(y >> 0, 8) as number;
+				}
 				if (inst < 224) inst &= 31;
 			}
 
@@ -273,7 +393,7 @@ export class ZMachine {
 					predicate(x > op1);
 					break;
 				case 6:
-					predicate(bytes[objects + op0 * 9 + 4] === op1);
+					predicate(getParent(op0) === op1);
 					break; // IN?
 				case 7:
 					predicate((op0 & op1) === op1);
@@ -309,7 +429,7 @@ export class ZMachine {
 					store(bytes[(op0 + op1) & 65535]!);
 					break; // GETB
 				case 17: // GETP
-					if (propfind()) store(bytes[op3 - 1]! & 32 ? mem.get(op3) : bytes[op3]!);
+					if (propfind()) store(op3Size === 2 ? mem.get(op3) : bytes[op3]!);
 					else store(mem.get(defprop + 2 * op1));
 					break;
 				case 18:
@@ -318,11 +438,16 @@ export class ZMachine {
 					break; // GETPT
 				case 19: // NEXTP
 					if (op1) {
+						// Advance past the current property's data to the next header, return num.
 						propfind();
-						store(bytes[op3 + (bytes[op3 - 1]! >> 5) + 1]! & 31);
+						const after = op3 + op3Size;
+						if (bytes[after] === 0) store(0);
+						else store(propLayout(after)[0]);
 					} else {
-						x = mem.getu(objects + op0 * 9 + 7);
-						store(bytes[x + bytes[x]! * 2 + 1]! & 31);
+						// First property of object op0.
+						x = getPropAddr(op0);
+						const first = x + bytes[x]! * 2 + 1;
+						store(bytes[first] === 0 ? 0 : propLayout(first)[0]);
 					}
 					break;
 				case 20:
@@ -345,18 +470,18 @@ export class ZMachine {
 					predicate(!op0);
 					break; // ZERO?
 				case 129: // NEXT?
-					store((x = bytes[objects + op0 * 9 + 5]!));
+					store((x = getSibling(op0)));
 					predicate(x);
 					break;
 				case 130: // FIRST?
-					store((x = bytes[objects + op0 * 9 + 6]!));
+					store((x = getChild(op0)));
 					predicate(x);
 					break;
 				case 131:
-					store(bytes[objects + op0 * 9 + 4]!);
+					store(getParent(op0));
 					break; // LOC
 				case 132:
-					store((bytes[(op0 - 1) & 65535]! >> 5) + 1);
+					store(propSizeAt(op0));
 					break; // PTSIZE
 				case 133:
 					x = xfetch(op0);
@@ -373,7 +498,7 @@ export class ZMachine {
 					move(op0, 0);
 					break; // REMOVE
 				case 138:
-					await genPrint(decode(mem.getu(objects + op0 * 9 + 7) + 1));
+					await genPrint(decode(getPropAddr(op0) + 1));
 					break; // PRINTD
 				case 139:
 					ret(op0);
@@ -443,7 +568,7 @@ export class ZMachine {
 				case 188: // USL
 					if (this.io.updateStatusLine) {
 						await this.io.updateStatusLine(
-							decode(mem.getu(objects + xfetch(16) * 9 + 7) + 1),
+							decode(getPropAddr(xfetch(16)) + 1),
 							xfetch(18),
 							xfetch(17)
 						);
@@ -453,23 +578,17 @@ export class ZMachine {
 					predicate(this.verify());
 					break; // VERIFY
 
-				case 224: {
-					// CALL
-					if (op0) {
-						const fn = addr(op0);
-						const localCount = bytes[fn]!;
-						cs.unshift({ ds, pc, local: new Int16Array(localCount) });
-						ds = [];
-						pc = fn + 1;
-						for (let i = 0; i < localCount; i++) cs[0]!.local[i] = pcget();
-						if (opc > 1 && localCount > 0) cs[0]!.local[0] = op1;
-						if (opc > 2 && localCount > 1) cs[0]!.local[1] = op2;
-						if (opc > 3 && localCount > 2) cs[0]!.local[2] = op3;
-					} else {
-						store(0);
-					}
+				case 25: // call_2s (2OP:25) — call routine with 1 arg, store result
+				case 224: // call_vs / call (VAR:224)
+					doCall();
 					break;
-				}
+				case 136: // call_1s (1OP:136) — call routine with no args, store result
+					opc = 1;
+					doCall();
+					break;
+				case 236: // call_vs2 (VAR:236) — call with up to 7 args, store result
+					doCall();
+					break;
 				case 225:
 					mem.put((op0 + op1 * 2) & 65535, op2);
 					break; // PUT
@@ -478,14 +597,14 @@ export class ZMachine {
 					break; // PUTB
 				case 227: // PUTP
 					propfind();
-					if (bytes[op3 - 1]! & 32) mem.put(op3, op2);
+					if (op3Size === 2) mem.put(op3, op2);
 					else bytes[op3] = op2;
 					break;
 				case 228: // READ
 					await genPrint('');
 					if (this.io.updateStatusLine) {
 						await this.io.updateStatusLine(
-							decode(mem.getu(objects + xfetch(16) * 9 + 7) + 1),
+							decode(getPropAddr(xfetch(16)) + 1),
 							xfetch(18),
 							xfetch(17)
 						);
@@ -525,6 +644,71 @@ export class ZMachine {
 				case 235:
 					if (this.io.screen) await this.io.screen(op0);
 					break; // SCREEN
+
+				// v4+ opcodes. Most are screen/IO concerns that xterm can't render yet;
+				// stub them so v4 games don't crash, but note: interactive v4 games that
+				// lean on these (upper window, cursor addressing) won't look right yet.
+				case 237: // erase_window
+				case 238: // erase_line
+				case 239: // set_cursor
+				case 240: // get_cursor
+				case 241: // set_text_style
+				case 242: // buffer_mode
+				case 245: // sound_effect
+					break;
+
+				case 243: { // output_stream
+					const sid = op0 << 16 >> 16; // sign-extend to int16
+					if (sid === 3) {
+						// Open memory stream; op1 = table address. Reserve first 2 bytes for length.
+						stream3.push({ base: op1, cursor: op1 + 2 });
+					} else if (sid === -3) {
+						// Close top memory stream; write length back to the first 2 bytes.
+						const top = stream3.pop();
+						if (top) mem.putu(top.base, top.cursor - top.base - 2);
+					}
+					// Streams 1, 2, 4 not yet implemented; silently ignore.
+					break;
+				}
+
+				case 244: // input_stream — no-op, we only read from the keyboard
+					break;
+
+				case 246: // read_char — read a single keypress, return its ZSCII code
+					await genPrint('');
+					if (this.io.updateStatusLine) {
+						await this.io.updateStatusLine(
+							decode(getPropAddr(xfetch(16)) + 1),
+							xfetch(18),
+							xfetch(17),
+						);
+					}
+					{
+						const s = await this.io.read(1);
+						store(s.length > 0 ? s.charCodeAt(0) : 13);
+					}
+					break;
+
+				case 247: { // scan_table
+					// op0 = value, op1 = table, op2 = length, op3 = form (v5+; default 0x82)
+					const form = opc >= 4 ? op3 : 0x82;
+					const isWord = !!(form & 0x80);
+					const entrySize = form & 0x7f;
+					const needle = op0 & 0xffff;
+					let found = 0;
+					for (let i = 0; i < op2; i++) {
+						const a = (op1 + i * entrySize) & 0xffff;
+						const v = isWord ? mem.getu(a) : bytes[a]!;
+						if (v === needle) {
+							found = a;
+							break;
+						}
+					}
+					store(found);
+					predicate(found);
+					break;
+				}
+
 				default:
 					throw new Error(`ZMachine: invalid opcode ${inst} at pc=${pc - 1}`);
 			}
