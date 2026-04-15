@@ -153,25 +153,15 @@ export class ZMachine {
 		//   v4-5: packed × 4
 		//   v7:   packed × 4 + (per-type offset × 8); routines and strings have separate offsets
 		//   v8:   packed × 8
-		// v7 offsets are read from the header during init() and captured below.
+		// v7 offsets are read from the header during init() and captured by reference.
 		let routineOff = 0;
 		let stringsOff = 0;
+		const baseShift = this.version === 3 ? 1 : this.version === 8 ? 3 : 2;
+		const basePack = (x: number): number => (x & 0xffff) << baseShift;
 		const packedRoutine =
-			this.version === 3
-				? (x: number) => (x & 0xffff) << 1
-				: this.version === 8
-					? (x: number) => (x & 0xffff) << 3
-					: this.version === 7
-						? (x: number) => ((x & 0xffff) << 2) + routineOff
-						: (x: number) => (x & 0xffff) << 2;
+			this.version === 7 ? (x: number) => basePack(x) + routineOff : basePack;
 		const packedString =
-			this.version === 3
-				? (x: number) => (x & 0xffff) << 1
-				: this.version === 8
-					? (x: number) => (x & 0xffff) << 3
-					: this.version === 7
-						? (x: number) => ((x & 0xffff) << 2) + stringsOff
-						: (x: number) => (x & 0xffff) << 2;
+			this.version === 7 ? (x: number) => basePack(x) + stringsOff : basePack;
 
 		const pcgetb = (): number => bytes[pc++]!;
 		const pcget = (): number => {
