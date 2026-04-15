@@ -1,8 +1,15 @@
 import { Memory } from './memory.ts';
-import { decodeText, zsciiToChar, charToZscii, readUnicodeTable, DEFAULT_ZSCII_EXTRA } from './text.ts';
+import {
+	decodeText,
+	zsciiToChar,
+	charToZscii,
+	readUnicodeTable,
+	readAlphabetTable,
+	DEFAULT_ZSCII_EXTRA,
+} from './text.ts';
 import { Vocabulary } from './vocab.ts';
 import { serialize, deserialize, verify, type CallFrame } from './saves.ts';
-import type { ZMachineIO } from './io.ts';
+import { normalizeRead, type ZMachineIO } from './io.ts';
 
 export interface ZMachineOptions {
 	isTandy?: boolean;
@@ -45,6 +52,7 @@ export class ZMachine {
 	private fwords = 0;
 	private vocabulary: Vocabulary | null = null;
 	private zsciiExtra: string = DEFAULT_ZSCII_EXTRA;
+	private alphabet: Uint8Array | null = null;
 
 	constructor(story: ArrayLike<number>, io: ZMachineIO, opts: ZMachineOptions = {}) {
 		const bytes = new Uint8Array(story);
@@ -76,7 +84,7 @@ export class ZMachine {
 	 * the opcode loop uses `decodeText` directly for the `end` return value.
 	 */
 	getText(addr: number): string {
-		return decodeText(this.mem, this.fwords, addr).text;
+		return decodeText(this.mem, this.fwords, addr, this.zsciiExtra, this.alphabet).text;
 	}
 
 	async run(): Promise<void> {
@@ -144,14 +152,24 @@ export class ZMachine {
 				// (v6/v7 only; zero in v5/v8).
 				routineOff = this.version === 7 ? mem.getu(40) * 8 : 0;
 				stringsOff = this.version === 7 ? mem.getu(42) * 8 : 0;
-				// v5+ may supply a custom ZSCII 155..223 translation via the header extension.
+				// v5+ may supply a custom ZSCII 155..223 translation via the header extension,
+				// and/or a replacement alphabet table at header byte 0x34.
 				if (this.version >= 5) {
 					this.zsciiExtra = readUnicodeTable(mem) ?? DEFAULT_ZSCII_EXTRA;
+					this.alphabet = readAlphabetTable(mem);
 				}
 			}
 			mem.put(16, this.savedFlags);
 			this.fwords = mem.getu(24);
-			if (!this.vocabulary) this.vocabulary = new Vocabulary(mem, this.fwords, mem.getu(8));
+			if (!this.vocabulary) {
+				this.vocabulary = new Vocabulary(
+					mem,
+					this.fwords,
+					mem.getu(8),
+					this.zsciiExtra,
+					this.alphabet,
+				);
+			}
 			defprop = mem.getu(10) - 2;
 			globals = mem.getu(12) - 32;
 			cs = [];
@@ -163,7 +181,7 @@ export class ZMachine {
 		};
 
 		const decode = (addr: number): string => {
-			const r = decodeText(mem, this.fwords, addr, this.zsciiExtra);
+			const r = decodeText(mem, this.fwords, addr, this.zsciiExtra, this.alphabet);
 			endText = r.end;
 			return r.text;
 		};
@@ -758,18 +776,27 @@ export class ZMachine {
 					if (op3Size === 2) mem.put(op3, op2);
 					else bytes[op3] = op2;
 					break;
-				case 228: // sread (v3/v4) / aread (v5: stores the terminator code)
+				case 228: { // sread (v3/v4) / aread (v5: stores the terminator code)
 					await genPrint('');
 					await refreshStatus();
-					this.vocabulary!.handleInput(
-						mem,
-						await this.io.read(bytes[op0 & 65535]!),
-						op0 & 65535,
-						op1 & 65535,
-						this.version,
+					// Operands 3 and 4 are v4+ timer: tenths of a second + routine.
+					// The routine callback isn't invoked yet; we honour the timeout by cancelling.
+					const tenths = opc > 2 ? op2 & 0xffff : 0;
+					const { text, cancelled } = normalizeRead(
+						await this.io.read(bytes[op0 & 65535]!, tenths > 0 ? { tenths } : undefined),
 					);
-					if (this.version >= 5) store(13); // 13 = newline; aread returns the terminator
+					if (!cancelled) {
+						this.vocabulary!.handleInput(
+							mem,
+							text,
+							op0 & 65535,
+							op1 & 65535,
+							this.version,
+						);
+					}
+					if (this.version >= 5) store(cancelled ? 0 : 13);
 					break;
+				}
 				case 229: // PRINTC (print_char) — a raw ZSCII code (155-223 are accents).
 					await genPrint(zsciiToChar(op0, this.zsciiExtra));
 					break;
@@ -845,8 +872,12 @@ export class ZMachine {
 				case 246: { // read_char — read a single keypress, return its ZSCII code
 					await genPrint('');
 					await refreshStatus();
-					const s = await this.io.read(1);
-					store(s.length > 0 ? s.charCodeAt(0) : 13);
+					// Operands: (device, tenths, routine). Device is always 1 per spec.
+					const tenths = opc > 1 ? op1 & 0xffff : 0;
+					const { text, cancelled } = normalizeRead(
+						await this.io.read(1, tenths > 0 ? { tenths } : undefined),
+					);
+					store(cancelled ? 0 : text.length > 0 ? text.charCodeAt(0) : 13);
 					break;
 				}
 

@@ -22,6 +22,10 @@ const MAX_CUSTOM_ENTRIES = ZSCII_EXTRA_MAX - ZSCII_EXTRA_MIN + 1; // 97
 const HEADER_EXT_PTR = 0x36;
 const UNICODE_TABLE_WORD = 3;
 
+// Custom alphabet table pointer (Z-spec §11.1.35, §3.5.5). v5+ only.
+const ALPHABET_TABLE_PTR = 0x34;
+const ALPHABET_TABLE_BYTES = 78; // 3 alphabets × 26 chars
+
 /**
  * Read a game-supplied Unicode translation table (v5+ header extension).
  * Returns the full 97-char table (padded from defaults) if present, or null.
@@ -42,6 +46,16 @@ export function readUnicodeTable(mem: Memory): string | null {
 		out += DEFAULT_ZSCII_EXTRA.slice(out.length);
 	}
 	return out;
+}
+
+/**
+ * Read a game-supplied alphabet table (v5+ header byte 0x34). Returns 78 bytes
+ * of ZSCII codes (26 each for A0, A1, A2) or null if the header slot is zero.
+ */
+export function readAlphabetTable(mem: Memory): Uint8Array | null {
+	const addr = mem.getu(ALPHABET_TABLE_PTR);
+	if (addr === 0) return null;
+	return mem.bytes.slice(addr, addr + ALPHABET_TABLE_BYTES);
 }
 
 /** Translate a raw ZSCII code to a single Unicode character. */
@@ -81,12 +95,14 @@ export interface DecodedText {
  * Decode Z-encoded text starting at `addr`.
  * @param fwords address of the abbreviation table (for shift-5 abbreviations).
  * @param zsciiExtra 155..223 Unicode translation; defaults to the Z-spec default.
+ * @param alphabet v5+ custom 78-byte alphabet table (§3.5.5); null uses defaults.
  */
 export function decodeText(
 	mem: Memory,
 	fwords: number,
 	addr: number,
 	zsciiExtra: string = DEFAULT_ZSCII_EXTRA,
+	alphabet: Uint8Array | null = null,
 ): DecodedText {
 	let o = '';
 	let ps = 0; // permanent shift
@@ -105,7 +121,8 @@ export function decodeText(
 			else if (y) o += zsciiToChar(y, zsciiExtra);
 			ts = ps;
 		} else if (ts === 5) {
-			o += decodeText(mem, fwords, mem.getu(fwords + (y + v) * 2) * 2, zsciiExtra).text;
+			o += decodeText(mem, fwords, mem.getu(fwords + (y + v) * 2) * 2, zsciiExtra, alphabet)
+				.text;
 			ts = ps;
 		} else if (v === 0) {
 			o += ' ';
@@ -118,6 +135,9 @@ export function decodeText(
 			else ps = ts = 0;
 		} else if (v === 6 && ts === 2) {
 			ts = 3;
+		} else if (alphabet) {
+			o += zsciiToChar(alphabet[ts * 26 + v - 6]!, zsciiExtra);
+			ts = ps;
 		} else {
 			o += ALPHABET[ts * 26 + v - 6];
 			ts = ps;

@@ -1,5 +1,5 @@
 import type { Terminal, IDisposable } from '@xterm/xterm';
-import type { ZMachineIO } from './zmachine/index.ts';
+import type { ZMachineIO, ReadResult, ReadTimer } from './zmachine/index.ts';
 
 const WINDOW_LOWER = 0;
 const WINDOW_UPPER = 1;
@@ -38,7 +38,7 @@ export class XtermIO implements ZMachineIO {
 	/** Print a message and await one line of input — for modal-style prompts. */
 	async prompt(message: string): Promise<string> {
 		this.print(message);
-		return this.read();
+		return (await this.read(255)).text;
 	}
 
 	dispose(): void {
@@ -170,9 +170,19 @@ export class XtermIO implements ZMachineIO {
 		this.upperEl.style.display = this.upperLines > 0 ? 'block' : 'none';
 	}
 
-	read(): Promise<string> {
-		return new Promise((resolve) => {
-			this.resolveRead = resolve;
+	read(_maxlen: number, timer?: ReadTimer): Promise<ReadResult> {
+		return new Promise<ReadResult>((resolve) => {
+			let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+			this.resolveRead = (line: string): void => {
+				if (timeoutHandle !== null) clearTimeout(timeoutHandle);
+				resolve({ text: line, cancelled: false });
+			};
+			if (timer && timer.tenths > 0) {
+				timeoutHandle = setTimeout(() => {
+					this.resolveRead = null;
+					resolve({ text: this.inputBuffer, cancelled: true });
+				}, timer.tenths * 100);
+			}
 		});
 	}
 

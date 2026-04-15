@@ -2,7 +2,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { ZMachine } from './zmachine/index.ts';
 import { XtermIO } from './io-xterm.ts';
-import { LocalStorageSaveStorage } from './save-storage.ts';
+import { LocalStorageSaveStorage, exportSave, importSave } from './save-storage.ts';
 import { createSavePrompt } from './save-prompt.ts';
 
 const DEFAULT_STORY = '/zork1.zip';
@@ -35,10 +35,13 @@ async function main(): Promise<void> {
 	const storyNameEl = document.getElementById('story-name');
 	const storyInput = document.getElementById('story-input') as HTMLInputElement | null;
 	const restartBtn = document.getElementById('restart');
+	const downloadSaveBtn = document.getElementById('download-save');
+	const uploadSaveInput = document.getElementById('upload-save') as HTMLInputElement | null;
 
 	let currentIO: XtermIO | null = null;
 	let currentStory: Uint8Array | null = null;
 	let currentName = '';
+	let currentStorage: LocalStorageSaveStorage | null = null;
 
 	const startGame = async (story: Uint8Array, name: string): Promise<void> => {
 		currentIO?.dispose();
@@ -49,6 +52,7 @@ async function main(): Promise<void> {
 
 		const io = new XtermIO(term, statusEl, upperEl);
 		const storage = new LocalStorageSaveStorage(`dork.save.${name}`);
+		currentStorage = storage;
 		const { save, restore } = createSavePrompt(storage, {
 			print: (t) => io.print(t),
 			prompt: (m) => io.prompt(m),
@@ -90,6 +94,47 @@ async function main(): Promise<void> {
 	restartBtn?.addEventListener('click', () => {
 		if (!currentStory) return;
 		void startGame(currentStory, currentName);
+	});
+
+	// Download a save slot to disk.
+	downloadSaveBtn?.addEventListener('click', () => {
+		if (!currentStorage) return;
+		const slots = currentStorage.list();
+		if (slots.length === 0) {
+			window.alert('No saves to download.');
+			return;
+		}
+		const choice = window.prompt(`Download which save?\n${slots.join(', ')}`, slots[0]);
+		if (!choice) return;
+		const bytes = currentStorage.read(choice);
+		if (!bytes) {
+			window.alert(`No save named "${choice}".`);
+			return;
+		}
+		const url = URL.createObjectURL(exportSave(bytes));
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `${choice}.qzl`;
+		a.click();
+		// Defer revoke: some browsers (Firefox) abort the download if the blob
+		// URL is released synchronously before the download task picks it up.
+		setTimeout(() => URL.revokeObjectURL(url), 0);
+	});
+
+	// Upload a save file into a named slot.
+	uploadSaveInput?.addEventListener('change', async () => {
+		const file = uploadSaveInput.files?.[0];
+		if (!file || !currentStorage) return;
+		const bytes = await importSave(file);
+		const suggested = file.name.replace(/\.[^.]+$/, '');
+		const name = window.prompt('Save as slot:', suggested);
+		uploadSaveInput.value = '';
+		if (!name) return;
+		if (currentStorage.write(name, bytes)) {
+			window.alert(`Saved to slot "${name}".`);
+		} else {
+			window.alert('Failed to save (quota exceeded?).');
+		}
 	});
 }
 

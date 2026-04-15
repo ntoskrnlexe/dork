@@ -9,7 +9,13 @@ export class Vocabulary {
 	private readonly map: Map<string, number> = new Map();
 	private readonly regBreak: RegExp;
 
-	constructor(mem: Memory, fwords: number, s: number) {
+	constructor(
+		mem: Memory,
+		fwords: number,
+		s: number,
+		zsciiExtra?: string,
+		alphabet: Uint8Array | null = null,
+	) {
 		if (s === 0) {
 			this.regBreak = new RegExp('[^ \\n\\t]+', 'g');
 			return;
@@ -27,7 +33,7 @@ export class Vocabulary {
 		let n = mem.get(s);
 		s += 2;
 		while (n--) {
-			this.map.set(decodeText(mem, fwords, s).text, s);
+			this.map.set(decodeText(mem, fwords, s, zsciiExtra, alphabet).text, s);
 			s += entrySize;
 		}
 	}

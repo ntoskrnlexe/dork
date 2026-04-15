@@ -24,10 +24,17 @@ export function verify(memInit: Uint8Array, mem: Memory): boolean {
 	return !pchksm;
 }
 
+// Per-frame fixed header: pc(4) + localByte(1) + dsLen(1–2 via Uint16 at +4) + argCount(1).
+// Total 7 bytes before variable-length ds and locals.
+const FRAME_HEADER_BYTES = 7;
+
 export function serialize(mem: Memory, ds: number[], cs: CallFrame[], pc: number): Uint8Array {
 	const purbot = mem.getu(14);
 	const total =
-		purbot + cs.reduce((p, c) => p + 2 * (c.ds.length + c.local.length) + 6, 0) + 2 * ds.length + 8;
+		purbot +
+		cs.reduce((p, c) => p + 2 * (c.ds.length + c.local.length) + FRAME_HEADER_BYTES, 0) +
+		2 * ds.length +
+		8;
 	const ar = new Uint8Array(total);
 	ar.set(new Uint8Array(mem.bytes.buffer, 0, purbot));
 	const vi = new DataView(ar.buffer);
@@ -41,14 +48,14 @@ export function serialize(mem: Memory, ds: number[], cs: CallFrame[], pc: number
 		const f = cs[i]!;
 		vi.setUint32(e, f.pc);
 		// `localByte` reuses the high byte of the pc word: low 4 bits = local count
-		// (max 15), bit 7 = discardResult flag (always 0 for v3/v4 saves, so old
-		// save files keep working).
+		// (max 15), bit 7 = discardResult flag.
 		vi.setUint8(e, f.local.length | (f.discardResult ? 0x80 : 0));
 		vi.setUint16(e + 4, f.ds.length);
-		for (let j = 0; j < f.ds.length; j++) vi.setInt16(e + j * 2 + 6, f.ds[j]!);
+		vi.setUint8(e + 6, f.argCount & 0xff);
+		for (let j = 0; j < f.ds.length; j++) vi.setInt16(e + j * 2 + FRAME_HEADER_BYTES, f.ds[j]!);
 		for (let j = 0; j < f.local.length; j++)
-			vi.setInt16(e + f.ds.length * 2 + j * 2 + 6, f.local[j]!);
-		e += (f.ds.length + f.local.length) * 2 + 6;
+			vi.setInt16(e + f.ds.length * 2 + j * 2 + FRAME_HEADER_BYTES, f.local[j]!);
+		e += (f.ds.length + f.local.length) * 2 + FRAME_HEADER_BYTES;
 	}
 	return ar;
 }
@@ -72,10 +79,9 @@ export function deserialize(mem: Memory, ar: Uint8Array): [number[], CallFrame[]
 			const discardResult = !!(localByte & 0x80);
 			const framePc = g24();
 			const dsFrame = Array.from({ length: g16() }, g16s);
+			const argCount = g8();
 			for (let j = 0; j < local.length; j++) local[j] = g16s();
-			// argCount isn't serialized (would break wire-compat with v3/v4 saves);
-			// default to localCount, which is conservative for check_arg_count.
-			cs[i] = { local, pc: framePc, ds: dsFrame, discardResult, argCount: local.length };
+			cs[i] = { local, pc: framePc, ds: dsFrame, discardResult, argCount };
 		}
 		const purbot = mem.getu(14);
 		mem.bytes.set(new Uint8Array(ar.buffer, 0, purbot));
