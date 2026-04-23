@@ -1,7 +1,15 @@
 {
 	"name": "dork",
-	"module": "src/server.ts",
 	"type": "module",
+	"main": "./src/zmachine/index.ts",
+	"module": "./src/zmachine/index.ts",
+	"types": "./src/zmachine/index.ts",
+	"exports": {
+		".": "./src/zmachine/index.ts",
+		"./save-storage": "./src/save-storage.ts",
+		"./save-prompt": "./src/save-prompt.ts",
+		"./io-xterm": "./src/io-xterm.ts"
+	},
 	"scripts": {
 		"dev": "bun --hot src/server.ts",
 		"start": "bun src/server.ts",
