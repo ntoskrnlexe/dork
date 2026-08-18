@@ -1,9 +1,10 @@
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { ZMachine } from './zmachine/index.ts';
-import { XtermIO } from './io-xterm.ts';
+import { XtermIO, IODisposedError } from './io-xterm.ts';
 import { LocalStorageSaveStorage, exportSave, importSave } from './save-storage.ts';
 import { createSavePrompt } from './save-prompt.ts';
+import { wireToolbar, type FileLike } from './toolbar.ts';
 
 const DEFAULT_STORY = '/zork1.zip';
 
@@ -55,7 +56,7 @@ async function main(): Promise<void> {
 		currentStorage = storage;
 		const { save, restore } = createSavePrompt(storage, {
 			print: (t) => io.print(t),
-			prompt: (m) => io.prompt(m),
+			prompt: (m) => io.prompt(m)
 		});
 		io.save = save;
 		io.restore = restore;
@@ -65,9 +66,68 @@ async function main(): Promise<void> {
 			await zm.run();
 			if (currentIO === io) term.writeln('\r\n\x1b[33m[Game ended.]\x1b[0m');
 		} catch (err) {
+			// A disposed IO means we deliberately tore this game down (restart, new
+			// story) — the replacement is already running, so say nothing.
+			if (err instanceof IODisposedError) return;
 			if (currentIO === io) term.writeln(`\r\n\x1b[31m[Error: ${String(err)}]\x1b[0m`);
 		}
 	};
+
+	// Wire the toolbar BEFORE booting a game. startGame's promise only settles
+	// when the game ends, so anything sequenced after it would never run.
+	wireToolbar(
+		{
+			storyInput,
+			restart: restartBtn,
+			downloadSave: downloadSaveBtn,
+			uploadSave: uploadSaveInput
+		},
+		{
+			loadStory: (bytes, name) => startGame(bytes, name),
+
+			restart: () => {
+				if (!currentStory) return;
+				return startGame(currentStory, currentName);
+			},
+
+			downloadSave: () => {
+				if (!currentStorage) return;
+				const slots = currentStorage.list();
+				if (slots.length === 0) {
+					window.alert('No saves to download.');
+					return;
+				}
+				const choice = window.prompt(`Download which save?\n${slots.join(', ')}`, slots[0]);
+				if (!choice) return;
+				const bytes = currentStorage.read(choice);
+				if (!bytes) {
+					window.alert(`No save named "${choice}".`);
+					return;
+				}
+				const url = URL.createObjectURL(exportSave(bytes));
+				const a = document.createElement('a');
+				a.href = url;
+				a.download = `${choice}.qzl`;
+				a.click();
+				// Defer revoke: some browsers (Firefox) abort the download if the blob
+				// URL is released synchronously before the download task picks it up.
+				setTimeout(() => URL.revokeObjectURL(url), 0);
+			},
+
+			uploadSave: async (file: FileLike) => {
+				if (!currentStorage) return;
+				const bytes = await importSave(file as unknown as File);
+				const suggested = file.name.replace(/\.[^.]+$/, '');
+				const name = window.prompt('Save as slot:', suggested);
+				if (!name) return;
+				if (currentStorage.write(name, bytes)) {
+					window.alert(`Saved to slot "${name}".`);
+				} else {
+					window.alert('Failed to save (quota exceeded?).');
+				}
+			}
+		}
+	);
 
 	// Pick initial story: ?story=... in the URL, or the default Zork I.
 	const urlStory = new URLSearchParams(location.search).get('story');
@@ -75,67 +135,12 @@ async function main(): Promise<void> {
 	term.writeln(`Loading ${initialPath}\u2026`);
 	try {
 		const bytes = await fetchStory(initialPath);
-		await startGame(bytes, initialPath);
+		// Deliberately not awaited — this settles only when the game ends.
+		void startGame(bytes, initialPath);
 	} catch (err) {
 		term.writeln(`\x1b[31m${String(err)}\x1b[0m`);
 		term.writeln('Use the toolbar above to load a local Z-machine v3 story file.');
 	}
-
-	// Local file upload.
-	storyInput?.addEventListener('change', async () => {
-		const file = storyInput.files?.[0];
-		if (!file) return;
-		const bytes = new Uint8Array(await file.arrayBuffer());
-		await startGame(bytes, file.name);
-		storyInput.value = '';
-	});
-
-	// Restart the current story from the top.
-	restartBtn?.addEventListener('click', () => {
-		if (!currentStory) return;
-		void startGame(currentStory, currentName);
-	});
-
-	// Download a save slot to disk.
-	downloadSaveBtn?.addEventListener('click', () => {
-		if (!currentStorage) return;
-		const slots = currentStorage.list();
-		if (slots.length === 0) {
-			window.alert('No saves to download.');
-			return;
-		}
-		const choice = window.prompt(`Download which save?\n${slots.join(', ')}`, slots[0]);
-		if (!choice) return;
-		const bytes = currentStorage.read(choice);
-		if (!bytes) {
-			window.alert(`No save named "${choice}".`);
-			return;
-		}
-		const url = URL.createObjectURL(exportSave(bytes));
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = `${choice}.qzl`;
-		a.click();
-		// Defer revoke: some browsers (Firefox) abort the download if the blob
-		// URL is released synchronously before the download task picks it up.
-		setTimeout(() => URL.revokeObjectURL(url), 0);
-	});
-
-	// Upload a save file into a named slot.
-	uploadSaveInput?.addEventListener('change', async () => {
-		const file = uploadSaveInput.files?.[0];
-		if (!file || !currentStorage) return;
-		const bytes = await importSave(file);
-		const suggested = file.name.replace(/\.[^.]+$/, '');
-		const name = window.prompt('Save as slot:', suggested);
-		uploadSaveInput.value = '';
-		if (!name) return;
-		if (currentStorage.write(name, bytes)) {
-			window.alert(`Saved to slot "${name}".`);
-		} else {
-			window.alert('Failed to save (quota exceeded?).');
-		}
-	});
 }
 
 main().catch((err) => {

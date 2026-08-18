@@ -4,6 +4,18 @@ import type { ZMachineIO, ReadResult, ReadTimer } from './zmachine/index.ts';
 const WINDOW_LOWER = 0;
 const WINDOW_UPPER = 1;
 
+/**
+ * Thrown from a pending or subsequent `read()` once the IO is disposed, so the
+ * machine driving it unwinds instead of playing on against a dead terminal.
+ * Callers that dispose deliberately (restart, load another story) should swallow it.
+ */
+export class IODisposedError extends Error {
+	constructor() {
+		super('XtermIO disposed');
+		this.name = 'IODisposedError';
+	}
+}
+
 export class XtermIO implements ZMachineIO {
 	save?: (bytes: Uint8Array) => Promise<boolean>;
 	restore?: () => Promise<Uint8Array | null>;
@@ -13,6 +25,7 @@ export class XtermIO implements ZMachineIO {
 	private readonly upperEl: HTMLElement | null;
 	private inputBuffer = '';
 	private resolveRead: ((value: string) => void) | null = null;
+	private rejectRead: ((reason: Error) => void) | null = null;
 	private col = 0;
 	private buffering = true;
 	private window = WINDOW_LOWER;
@@ -45,9 +58,12 @@ export class XtermIO implements ZMachineIO {
 		if (this.disposed) return;
 		this.disposed = true;
 		this.dataDisposable.dispose();
-		const r = this.resolveRead;
+		const reject = this.rejectRead;
 		this.resolveRead = null;
-		if (r) r('');
+		this.rejectRead = null;
+		// Resolving with '' would just feed the old machine a blank line and let it
+		// keep running against the terminal the next machine has taken over.
+		if (reject) reject(new IODisposedError());
 	}
 
 	private handleInput(data: string): void {
@@ -97,6 +113,7 @@ export class XtermIO implements ZMachineIO {
 	}
 
 	print(text: string): void {
+		if (this.disposed) return;
 		if (this.window === WINDOW_UPPER) {
 			this.writeUpper(text);
 			return;
@@ -161,7 +178,7 @@ export class XtermIO implements ZMachineIO {
 	}
 
 	private renderUpper(): void {
-		if (!this.upperEl) return;
+		if (this.disposed || !this.upperEl) return;
 		const rows = this.upperRows.slice(0, this.upperLines);
 		while (rows.length < this.upperLines) rows.push('');
 		const width = Math.max(1, this.term.cols);
@@ -171,15 +188,19 @@ export class XtermIO implements ZMachineIO {
 	}
 
 	read(_maxlen: number, timer?: ReadTimer): Promise<ReadResult> {
-		return new Promise<ReadResult>((resolve) => {
+		if (this.disposed) return Promise.reject(new IODisposedError());
+		return new Promise<ReadResult>((resolve, reject) => {
 			let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
 			this.resolveRead = (line: string): void => {
+				this.rejectRead = null;
 				if (timeoutHandle !== null) clearTimeout(timeoutHandle);
 				resolve({ text: line, cancelled: false });
 			};
+			this.rejectRead = reject;
 			if (timer && timer.tenths > 0) {
 				timeoutHandle = setTimeout(() => {
 					this.resolveRead = null;
+					this.rejectRead = null;
 					resolve({ text: this.inputBuffer, cancelled: true });
 				}, timer.tenths * 100);
 			}
@@ -188,7 +209,7 @@ export class XtermIO implements ZMachineIO {
 
 	// v18 = globals[2] = moves; v17 = globals[1] = score.
 	updateStatusLine(text: string, v18: number, v17: number): void {
-		if (!this.statusEl) return;
+		if (this.disposed || !this.statusEl) return;
 		const cols = Math.max(40, this.term.cols);
 		const left = ' ' + text;
 		const right = ` Score: ${v17}  Moves: ${v18} `;
@@ -238,11 +259,13 @@ export class XtermIO implements ZMachineIO {
 	}
 
 	private clearLower(): void {
+		if (this.disposed) return;
 		this.term.reset();
 		this.col = 0;
 	}
 
 	eraseLine(value: number): void {
+		if (this.disposed) return;
 		if (value !== 1) return; // Z-machine defines only value=1
 		if (this.window === WINDOW_UPPER) {
 			const y = this.upperCursor.y - 1;
@@ -265,6 +288,7 @@ export class XtermIO implements ZMachineIO {
 	}
 
 	setTextStyle(style: number): void {
+		if (this.disposed) return;
 		if (this.window === WINDOW_UPPER) return; // upper window styles not yet rendered
 		// Reset first so each call sets exactly the requested combination.
 		const codes: string[] = ['0'];
