@@ -111,12 +111,13 @@ For more information, read the Bun API docs in `node_modules/bun-types/docs/**.m
 
 ## Z-machine development
 
-- Story file: `../zork1/zork1.zip` (Infocom Z-machine v3, Release 119).
-- Story corpus: `../zifmia/` — `infocom/*.z[3-6]` for real games (incl. v4 amfv, trinity, bureaucracy, nord_and_bert), `testers/` for CZECH/Etude/Praxix/gntests/strictz/unicode.
+- Story file: `vendor/zork1/zork1.zip` (Infocom Z-machine v3, Release 119), vendored — MIT, see `vendor/zork1/README.md`. `DORK_STORY` overrides what the dev server serves.
+- Optional story corpus, **not** in this repo because those games are still proprietary: clone <https://github.com/jeffnyman/zifmia> as a sibling at `../zifmia/` — `infocom/*.z[3-6]` for real games (incl. v4 amfv, trinity, bureaucracy, nord_and_bert), `testers/` for CZECH/Etude/Praxix/gntests/strictz/unicode. `test/v4-games.test.ts` skips itself when it's absent.
 - Compile CZECH (or any Inform source) per version: `inform6 -v3 czech.inf` → `czech.z3`. The reference `.out3/4/5/8` files in zifmia use **CRLF**; normalize to LF before diffing.
 - Reference interpreter: `dfrotz` (dumb frontend). Regenerate golden transcript:
-  `dfrotz -p -m -Z 0 -s <seed> -w 80 ../zork1/zork1.zip < commands.txt > zork1.script.expected.txt`
+  `dfrotz -p -m -Z 0 -s <seed> -w 80 vendor/zork1/zork1.zip < commands.txt > zork1.script.expected.txt`
 - `zork1.script.txt` is a 365-command walkthrough. Lines starting with `#` are test-harness directives (e.g. `#random -2` = PRNG seed), not game commands.
 - PRNG algorithms differ between interpreters — byte-exact transcript match only holds until the first random event (songbird chirp in Zork, ~263 words in).
 - **Operand sign trap**: `pcget` returns int16 signed; memory addresses ≥ 0x8000 come back negative. Mask with `& 0xFFFF` before passing to `mem.put*`/array indexing. Caught Trinity's `output_stream 3` crash.
 - `test/actual.txt` and `test/czech.actual*.txt` are debug dumps from the regression tests; gitignored.
+- Licensing/attribution lives in `NOTICE.md` and `test/fixtures/README.md`. Never vendor story files beyond Zork I/II/III — only those are MIT.

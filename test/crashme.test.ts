@@ -3,7 +3,7 @@ import { ZMachine } from '../src/zmachine/index.ts';
 import { makeStubIO } from './helpers/stub-io.ts';
 
 /**
- * crashme (by Andrew Plotkin) generates random Z-code at runtime and executes
+ * crashme (by Evin Robertson) generates random Z-code at runtime and executes
  * it. The point is to verify the interpreter doesn't take down its host on
  * garbage input — infinite loops, segfaults, runaway memory use, etc. We run
  * it in non-strict mode (invalid opcodes no-op) with a hard instruction cap

@@ -4,6 +4,12 @@ import { ZMachine, type ZMachineIO } from '../src/zmachine/index.ts';
 const STORY_DIR = '../zifmia/infocom';
 const ZIFMIA = '../zifmia';
 
+// Only Zork I/II/III were MIT-licensed; these Infocom games are still
+// proprietary, so the corpus is never vendored into this repo. Skip the whole
+// file when it isn't present locally. See CLAUDE.md for the expected layout.
+const hasCorpus = await Bun.file(`${STORY_DIR}/amfv.z4`).exists();
+const corpusTest = test.skipIf(!hasCorpus);
+
 /** Minimal IO that captures output and feeds a few neutral commands then quits. */
 function scriptedIO(): { io: ZMachineIO; output: { value: string } } {
 	const out = { value: '' };
@@ -38,7 +44,7 @@ async function playIntro(relPath: string): Promise<string> {
 	const file = Bun.file(relPath);
 	if (!(await file.exists())) {
 		throw new Error(
-			`Missing ${relPath}. These tests expect the zifmia repo at ${ZIFMIA}; see CLAUDE.md.`,
+			`Missing ${relPath}. These tests expect the zifmia corpus at ${ZIFMIA}; see CLAUDE.md.`,
 		);
 	}
 	const story = new Uint8Array(await file.arrayBuffer());
@@ -53,25 +59,25 @@ async function playIntro(relPath: string): Promise<string> {
 	return output.value;
 }
 
-test('v4 smoke: amfv.z4 boots, prints PRISM intro, quits cleanly', async () => {
+corpusTest('v4 smoke: amfv.z4 boots, prints PRISM intro, quits cleanly', async () => {
 	const out = await playIntro(`${STORY_DIR}/amfv.z4`);
 	expect(out).toContain('PRISM Project');
 	expect(out).toContain('Do you really want to quit');
 }, 30_000);
 
-test('v4 smoke: trinity.z4 boots, reaches Kensington Gardens, quits cleanly', async () => {
+corpusTest('v4 smoke: trinity.z4 boots, reaches Kensington Gardens, quits cleanly', async () => {
 	const out = await playIntro(`${STORY_DIR}/trinity.z4`);
 	expect(out).toContain('Kensington Gardens');
 	expect(out).toContain('Palace Gate');
 }, 30_000);
 
-test('v4 smoke: nord_and_bert.z4 boots, shows the menu, quits cleanly', async () => {
+corpusTest('v4 smoke: nord_and_bert.z4 boots, shows the menu, quits cleanly', async () => {
 	const out = await playIntro(`${STORY_DIR}/nord_and_bert.z4`);
 	expect(out).toContain('Shake a Tower');
 	expect(out).toContain('BEGINNING');
 }, 30_000);
 
-test('v5 smoke: hitchhikers_guide.z5 boots, accepts WAIT, reaches the score prompt', async () => {
+corpusTest('v5 smoke: hitchhikers_guide.z5 boots, accepts WAIT, reaches the score prompt', async () => {
 	const out = await playIntro(`${STORY_DIR}/hitchhikers_guide.z5`);
 	expect(out).toContain('THE HITCHHIKER');
 	expect(out).toContain('You wake up');
@@ -79,30 +85,30 @@ test('v5 smoke: hitchhikers_guide.z5 boots, accepts WAIT, reaches the score prom
 	expect(out).toContain('Do you wish to leave');
 }, 30_000);
 
-test('v5 smoke: planetfall.z5 boots and quits cleanly', async () => {
+corpusTest('v5 smoke: planetfall.z5 boots and quits cleanly', async () => {
 	const out = await playIntro(`${STORY_DIR}/planetfall.z5`);
 	expect(out).toContain('PLANETFALL');
 	expect(out).toContain('Stellar Patrol');
 }, 30_000);
 
-test('v5 smoke: sherlock.z5 boots and quits cleanly', async () => {
+corpusTest('v5 smoke: sherlock.z5 boots and quits cleanly', async () => {
 	const out = await playIntro(`${STORY_DIR}/sherlock.z5`);
 	expect(out).toContain('Sherlock');
 }, 30_000);
 
-test('v7 smoke: simple_test.z7 reports screen dimensions correctly', async () => {
+corpusTest('v7 smoke: simple_test.z7 reports screen dimensions correctly', async () => {
 	const out = await playIntro(`${ZIFMIA}/simple_test.z7`);
 	expect(out).toContain('cells 25 by 80');
 	expect(out).toContain('units 80 by 25');
 }, 30_000);
 
-test('v8 smoke: advent.z8 (Colossal Cave) boots and plays', async () => {
+corpusTest('v8 smoke: advent.z8 (Colossal Cave) boots and plays', async () => {
 	const out = await playIntro(`${ZIFMIA}/advent/advent.z8`);
 	expect(out).toContain('standing');
 	expect(out).toContain('small brick building');
 }, 30_000);
 
-test('v8 smoke: risorg.z8 (Reliques of Tolti-Aph) boots', async () => {
+corpusTest('v8 smoke: risorg.z8 (Reliques of Tolti-Aph) boots', async () => {
 	const out = await playIntro(`${ZIFMIA}/games/risorg.z8`);
 	// Inform 7 story with a substantial intro.
 	expect(out.length).toBeGreaterThan(500);

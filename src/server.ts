@@ -1,6 +1,7 @@
 import index from './index.html';
 
-const STORY_PATH = '../zork1/zork1.zip';
+// Zork I ships with the repo (MIT, see vendor/zork1/). Override to serve another story.
+const STORY_PATH = process.env.DORK_STORY ?? 'vendor/zork1/zork1.zip';
 
 const server = Bun.serve({
 	port: Number(process.env.PORT) || 3000,

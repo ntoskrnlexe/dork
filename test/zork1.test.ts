@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { ZMachine, type ZMachineIO } from '../src/zmachine/index.ts';
 
-const STORY_PATH = '../zork1/zork1.zip';
+const STORY_PATH = 'vendor/zork1/zork1.zip';
 const SCRIPT_PATH = 'zork1.script.txt';
 const EXPECTED_PATH = 'zork1.script.expected.txt';
 
